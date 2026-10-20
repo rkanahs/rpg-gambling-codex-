@@ -459,3 +459,5 @@ function paint(x,list){document.getElementById('petResult').textContent=[('['+x.
 window.ourRpgPetRoll=function(){const MK='our-rpg-last-movement-result-v1',SK='our-rpg-growth-open:pet-roulette-results',xmove=get(MK,null),st=document.getElementById('petStatus');if(!xmove||!String(xmove.encounter||'').includes('펫 등장')){st.textContent='이동 결과판에서 야생 펫 조우가 먼저 나와야 해.';return}let list=get(SK,[]);if(!Array.isArray(list))list=[];let x=list.find(v=>v.movementId===xmove.id);if(!x){const region=O[xmove.region]?xmove.region:'평원',roll=Math.floor(Math.random()*100)+1,rank=O[region].find(v=>roll<=v[0])[1],a=P[rank],pet=a[Math.floor(Math.random()*a.length)];x={movementId:xmove.id,character:xmove.character||'모험가',region:region,roll:roll,rarity:rank,name:pet[0],effect:pet[1],at:new Date().toISOString()};list.unshift(x);list=list.slice(0,20);localStorage.setItem(SK,JSON.stringify(list))}paint(x,list)};
 })();
 </script>
+
+<style id="pet-roulette-overlay-top">#petRouletteModal{z-index:2200!important}</style>
