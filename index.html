@@ -357,3 +357,43 @@ document.addEventListener('keydown',function(event){if(event.key==='Escape'&&emb
 const initial=slugFromLocation();if(initial){history.replaceState({rpgCodex:true,rpgCodexSlug:initial,rpgCodexDepth:0},'',codexUrl(initial));renderEmbedded(initial,titleFor(initial))}else history.replaceState({rpgPortal:true},'',location.href);
 </script></body>
 </html>
+
+	<script id="movement-battle-bridge">
+(function(){
+  const KEY='our-rpg-last-movement-result-v1';
+  const BATTLE_TYPES=new Set(['일반 몬스터','희귀 몬스터','일반 보스','중간보스 등장','최종보스 등장']);
+  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+  function movement(doc){
+    const actions=doc.querySelector('.actions'),judge=doc.querySelector('#judge');
+    if(!actions||!judge||doc.querySelector('#openBattle'))return;
+    const button=doc.createElement('button');
+    button.id='openBattle';button.type='button';button.hidden=true;button.textContent='⚔️ 등장 대상과 전투하기';actions.appendChild(button);
+    const sync=()=>{const r=read();button.hidden=!(r&&r.encounterName&&BATTLE_TYPES.has(r.encounter))};
+    judge.addEventListener('click',()=>setTimeout(sync,0));
+    button.addEventListener('click',()=>window.postMessage({type:'open-rpg-codex',slug:'our-rpg-monster-battle'},'*'));
+    sync();
+  }
+  function battle(doc){
+    const start=doc.querySelector('#start'),select=doc.querySelector('#monster'),buttons=doc.querySelector('.buttons');
+    if(!start||!select||!buttons||doc.querySelector('#loadEncounter'))return;
+    const load=doc.createElement('button');load.id='loadEncounter';load.type='button';load.textContent='🧭 최근 이동 조우';buttons.insertBefore(load,start.nextSibling);
+    let notice=doc.querySelector('#encounterNotice');
+    if(!notice){notice=doc.createElement('p');notice.id='encounterNotice';notice.className='help';buttons.insertAdjacentElement('afterend',notice)}
+    const apply=(show)=>{
+      const r=read(),name=r&&String(r.encounterName||'').trim();
+      if(!name){if(show)notice.textContent='최근 이동에서 불러올 몬스터·보스가 없어.';return false}
+      const options=[...select.options],index=options.findIndex(o=>o.textContent.split(' · ')[0].trim()===name);
+      if(index<0){notice.textContent='최근 이동 조우: '+name+' · 고정 능력치가 없어 운영자 판정이 필요해.';return false}
+      select.selectedIndex=index;notice.textContent='최근 이동 조우 불러옴 · '+name+' · '+(r.region||'지역 미확인');
+      if(show)load.textContent='✓ 최근 이동 조우 불러옴';return true;
+    };
+    load.addEventListener('click',()=>apply(true));apply(false);
+  }
+  function enhance(){
+    const doc=embeddedFrame&&embeddedFrame.contentDocument;if(!doc)return;
+    if(activeSlug==='our-rpg-movement-results')movement(doc);
+    if(activeSlug==='our-rpg-monster-battle')battle(doc);
+  }
+  embeddedFrame.addEventListener('load',()=>setTimeout(enhance,0));
+}());
+</script>
