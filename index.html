@@ -397,3 +397,5 @@ const initial=slugFromLocation();if(initial){history.replaceState({rpgCodex:true
   embeddedFrame.addEventListener('load',()=>setTimeout(enhance,0));
 }());
 </script>
+
+<script id="movement-battle-direct-fix">(function(){function fix(){const d=embeddedFrame&&embeddedFrame.contentDocument,b=d&&d.querySelector('#openBattle');if(!b||b.dataset.directFix)return;b.dataset.directFix='1';b.addEventListener('click',e=>{e.stopImmediatePropagation();document.querySelector('a[href="our-rpg-monster-battle/"]').click()},true)}embeddedFrame.addEventListener('load',()=>setTimeout(fix,0));setTimeout(fix,0)}());</script>
