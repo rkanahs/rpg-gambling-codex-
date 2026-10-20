@@ -520,3 +520,30 @@ window.ourRpgPetRoll=function(){const MK='our-rpg-last-movement-result-v1',SK='o
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 </script>
+
+<style id="pet-collection-manager-style">
+.pet-collection-manager{border:1px solid #6d5930;background:linear-gradient(135deg,#171d18,#111812);padding:14px;margin:12px 0 16px}.pet-collection-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.pet-collection-summary strong{color:#f0cf7c}.pet-collection-summary span{color:#b8c8c0;font-size:13px}.pet-owned-only{margin-left:auto;min-height:44px;border:1px solid #52695f;background:#14231e;color:#e7eee9;padding:9px 13px;font-weight:850;cursor:pointer}.pet-owned-only[aria-pressed="true"]{border-color:#d3ae58;background:#3a2d13;color:#ffe19a}.pet-manage-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.pet-manage-btn{min-height:38px;border:1px solid #476155;background:#112019;color:#cfe0d7;padding:6px 10px;font-size:12px;font-weight:850;cursor:pointer}.pet-manage-btn.is-owned{border-color:#5f967d;background:#173529;color:#bff0d5}.pet-manage-btn.is-companion{border-color:#d3ae58;background:#493817;color:#ffe19a}.pet-row.pet-owned-hidden{display:none!important}.pet-row.current-companion{box-shadow:inset 3px 0 #d3ae58;background:#1b2118}@media(max-width:560px){.pet-collection-summary{align-items:stretch}.pet-owned-only{width:100%;margin-left:0}.pet-manage-actions{display:grid;grid-template-columns:1fr 1fr}.pet-manage-btn{width:100%}}
+</style>
+<script id="pet-collection-manager">
+(function(){
+  var KEY='ourRpgPetCollectionV1';
+  var state={owned:[],companion:null};
+  function load(){try{var saved=JSON.parse(localStorage.getItem(KEY)||'{}');state.owned=Array.isArray(saved.owned)?saved.owned:[];state.companion=typeof saved.companion==='string'?saved.companion:null;}catch(e){state={owned:[],companion:null};}}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function petName(row){var strong=row.querySelector('strong');if(!strong)return'';var copy=strong.cloneNode(true);copy.querySelectorAll('.pet-type-badge').forEach(function(x){x.remove();});var m=copy.textContent.trim().match(/^\[(?:SSS|SS|S|A|B|N)\]\s*(.+)$/);return m?m[1].trim():'';}
+  function refresh(){
+    var rows=document.querySelectorAll('#petCatalog .pet-row');var ownedSet=new Set(state.owned);var ownedOnly=document.getElementById('petOwnedOnly')&&document.getElementById('petOwnedOnly').getAttribute('aria-pressed')==='true';
+    rows.forEach(function(row){var name=petName(row);var owned=ownedSet.has(name);var companion=state.companion===name;row.classList.toggle('current-companion',companion);row.classList.toggle('pet-owned-hidden',ownedOnly&&!owned);var own=row.querySelector('[data-pet-action="owned"]');var follow=row.querySelector('[data-pet-action="companion"]');if(own){own.classList.toggle('is-owned',owned);own.textContent=owned?'✓ 보유 중':'＋ 보유 표시';own.setAttribute('aria-pressed',String(owned));}if(follow){follow.classList.toggle('is-companion',companion);follow.textContent=companion?'★ 동행 중':'동행 설정';follow.setAttribute('aria-pressed',String(companion));}});
+    var count=document.getElementById('petOwnedCount');if(count)count.textContent='보유 '+state.owned.length+' / 60';var current=document.getElementById('petCompanionName');if(current)current.textContent='현재 동행: '+(state.companion||'없음');
+  }
+  function init(){
+    var catalog=document.getElementById('petCatalog');if(!catalog||catalog.dataset.collectionManager==='1')return false;var rows=catalog.querySelectorAll('.pet-row');if(!rows.length)return false;catalog.dataset.collectionManager='1';load();
+    var manager=document.createElement('section');manager.className='pet-collection-manager';manager.innerHTML='<div class="pet-collection-summary"><strong id="petOwnedCount">보유 0 / 60</strong><span id="petCompanionName">현재 동행: 없음</span><button type="button" class="pet-owned-only" id="petOwnedOnly" aria-pressed="false">보유한 펫만 보기</button></div>';
+    var filters=catalog.querySelector('.pet-type-filters');if(filters)filters.insertAdjacentElement('afterend',manager);else catalog.prepend(manager);
+    rows.forEach(function(row){var name=petName(row);if(!name)return;var actions=document.createElement('div');actions.className='pet-manage-actions';actions.innerHTML='<button type="button" class="pet-manage-btn" data-pet-action="owned" aria-pressed="false">＋ 보유 표시</button><button type="button" class="pet-manage-btn" data-pet-action="companion" aria-pressed="false">동행 설정</button>';row.appendChild(actions);actions.addEventListener('click',function(e){var btn=e.target.closest('button');if(!btn)return;if(btn.dataset.petAction==='owned'){var i=state.owned.indexOf(name);if(i>=0){state.owned.splice(i,1);if(state.companion===name)state.companion=null;}else state.owned.push(name);}else if(btn.dataset.petAction==='companion'){if(state.owned.indexOf(name)<0)state.owned.push(name);state.companion=state.companion===name?null:name;}save();refresh();});});
+    document.getElementById('petOwnedOnly').addEventListener('click',function(){var on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',String(on));this.textContent=on?'전체 펫 다시 보기':'보유한 펫만 보기';refresh();});refresh();return true;
+  }
+  function start(){if(init())return;var n=0,t=setInterval(function(){n++;if(init()||n>40)clearInterval(t);},250);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
