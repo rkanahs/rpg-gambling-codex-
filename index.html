@@ -464,3 +464,59 @@ window.ourRpgPetRoll=function(){const MK='our-rpg-last-movement-result-v1',SK='o
 
 <style id="pet-odds-table-style">.pet-odds-wrap{grid-column:1/-1;border:1px solid #6d5930;border-radius:14px;background:#171910;padding:14px;overflow-x:auto}.pet-odds-wrap h3{margin:0 0 9px;color:#f0cf8a}.pet-odds-table{width:100%;min-width:540px;border-collapse:collapse;text-align:center;font-size:.84rem}.pet-odds-table th,.pet-odds-table td{border:1px solid #34463e;padding:9px 7px}.pet-odds-table th{background:#1d2b25;color:#f0cf8a}.pet-odds-table td:first-child{font-weight:900;color:#fff}.pet-odds-note{margin:9px 0 0;color:#aebdb5;font-size:.78rem}@media(max-width:600px){.pet-odds-wrap{padding:11px}.pet-odds-table{font-size:.76rem}.pet-odds-table th,.pet-odds-table td{padding:8px 6px}}</style>
 <script id="pet-odds-table-visible">(function(){const box=document.getElementById('petCatalog');if(!box||document.getElementById('petOddsTable'))return;const s=document.createElement('section');s.id='petOddsTable';s.className='pet-odds-wrap';s.innerHTML='<h3>지역별 펫 등급 확률</h3><table class="pet-odds-table"><thead><tr><th>지역</th><th>N</th><th>B</th><th>A</th><th>S</th><th>SS</th><th>SSS</th></tr></thead><tbody><tr><td>평원</td><td>55%</td><td>28%</td><td>12%</td><td>4%</td><td>1%</td><td>0%</td></tr><tr><td>대륙</td><td>35%</td><td>30%</td><td>20%</td><td>10%</td><td>4%</td><td>1%</td></tr><tr><td>경계</td><td>0%</td><td>15%</td><td>25%</td><td>30%</td><td>20%</td><td>10%</td></tr></tbody></table><p class="pet-odds-note">D100으로 등급을 먼저 정한 뒤, 해당 등급의 기존 펫 60종 중 한 마리가 등장합니다.</p>';box.prepend(s)})();</script>
+
+<style id="pet-type-filter-style">
+.pet-type-guide{border:1px solid #3d6655;background:#0c1814;padding:13px 14px;margin:12px 0;color:#c9d8d1;font-size:13px;line-height:1.65}.pet-type-guide b{color:#f0cf7c}.pet-type-filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 16px}.pet-type-filter{min-height:44px;border:1px solid #49665a;background:#13231d;color:#dce8e2;padding:9px 13px;font-weight:850;cursor:pointer}.pet-type-filter[aria-pressed="true"]{border-color:#d3ae58;background:#3a2d13;color:#ffe19a}.pet-type-badge{display:inline-block;margin-left:7px;border:1px solid #4f7464;border-radius:999px;padding:2px 7px;font-size:11px;line-height:1.5;vertical-align:middle;color:#bfe8d2;background:#10251d}.pet-type-badge.random{border-color:#8164a2;color:#dfc8ff;background:#241831}.pet-row.pet-type-hidden{display:none!important}.pet-type-count{color:#8fc7aa;font-size:12px;margin-left:auto;align-self:center}@media(max-width:560px){.pet-type-filters{display:grid;grid-template-columns:1fr 1fr}.pet-type-filter{width:100%}.pet-type-count{grid-column:1/-1;margin-left:0}}
+</style>
+<script id="pet-type-filter-upgrade">
+(function(){
+  var RANDOM_NAMES=new Set(['행운 햄스터','도굴 두더지','동전 고양이','보물 미믹 새끼','장난꾸러기 여우','무지개 새','운명의 슬라임','황금 고블린 새끼','신비한 알','무지개 정령','운명의 정령','보물 정령','행운의 용','혼돈의 정령왕','기적의 별짐승','운명을 굴리는 자']);
+  var BONUS={N:'+1회',B:'+2회',A:'+3회',S:'+5회',SS:'+10회',SSS:'+20회'};
+  function rowInfo(row){
+    var strong=row.querySelector('strong');
+    var text=strong?strong.textContent.trim():'';
+    var m=text.match(/^\[(N|B|A|S|SS|SSS)\]\s*(.+?)(?:\s*·|$)/);
+    if(!m){m=text.match(/^\[(SSS|SS|S|A|B|N)\]\s*(.+)$/);}
+    return m?{rank:m[1],name:m[2].trim()}:null;
+  }
+  function applyFilter(kind){
+    var rows=document.querySelectorAll('#petCatalog .pet-row');
+    var visible=0;
+    rows.forEach(function(row){var show=kind==='all'||row.dataset.petType===kind;row.classList.toggle('pet-type-hidden',!show);if(show)visible++;});
+    document.querySelectorAll('.pet-type-filter').forEach(function(btn){btn.setAttribute('aria-pressed',String(btn.dataset.filter===kind));});
+    var count=document.getElementById('petTypeCount');if(count)count.textContent='표시 중 '+visible+'종';
+  }
+  function annotateResult(){
+    var box=document.getElementById('petResult');if(!box)return;
+    var text=box.textContent||'';if(!text.trim()||text.indexOf('아직')>=0)return;
+    var lines=text.split(/\n/).filter(function(line){return line.trim()&&!/^유형:/.test(line.trim());});
+    var m=lines[0]&&lines[0].match(/^\[(SSS|SS|S|A|B|N)\]\s*(.+)$/);if(!m)return;
+    var name=m[2].trim();var random=RANDOM_NAMES.has(name);
+    var typeLine=random?'유형: 랜덤 확률형 · 이동 주사위 +0회':'유형: 이동형 · 원본 추가 이동 '+(BONUS[m[1]]||'등급별 적용');
+    lines.splice(1,0,typeLine);box.textContent=lines.join(String.fromCharCode(10));
+  }
+  function init(){
+    var catalog=document.getElementById('petCatalog');if(!catalog||catalog.dataset.typeUpgrade==='1')return false;
+    var rows=catalog.querySelectorAll('.pet-row');if(!rows.length)return false;
+    catalog.dataset.typeUpgrade='1';
+    rows.forEach(function(row){
+      var info=rowInfo(row);if(!info)return;
+      var random=RANDOM_NAMES.has(info.name);row.dataset.petType=random?'random':'move';
+      var strong=row.querySelector('strong');if(strong&&!strong.querySelector('.pet-type-badge')){
+        var badge=document.createElement('span');badge.className='pet-type-badge '+(random?'random':'move');badge.textContent=random?'랜덤 확률형':'이동형';strong.appendChild(badge);
+      }
+    });
+    var guide=document.createElement('div');guide.className='pet-type-guide';guide.innerHTML='<b>펫 유형 안내</b><br>이동형 44종: 등급별 추가 이동 주사위와 고유 효과를 함께 적용합니다.<br>랜덤 확률형 16종: 이동 주사위는 +0회이며 고유 확률 효과만 적용합니다.<br>실제 1회 이동은 기본 D1000 1회 + 펫·탈것 보조 합계 최대 2회로, 총 3회까지만 굴립니다.';
+    var filters=document.createElement('div');filters.className='pet-type-filters';filters.setAttribute('role','group');filters.setAttribute('aria-label','펫 유형 필터');filters.innerHTML='<button type="button" class="pet-type-filter" data-filter="all" aria-pressed="true">전체 60</button><button type="button" class="pet-type-filter" data-filter="move" aria-pressed="false">이동형 44</button><button type="button" class="pet-type-filter" data-filter="random" aria-pressed="false">랜덤형 16</button><span class="pet-type-count" id="petTypeCount">표시 중 60종</span>';
+    var odds=catalog.querySelector('.pet-odds-table-wrap,.pet-odds-table');var anchor=odds?(odds.closest('.pet-odds-table-wrap')||odds):catalog.firstChild;
+    if(anchor&&anchor.parentNode===catalog){anchor.insertAdjacentElement('afterend',guide);guide.insertAdjacentElement('afterend',filters);}else{catalog.prepend(filters);catalog.prepend(guide);}
+    filters.querySelectorAll('button').forEach(function(btn){btn.addEventListener('click',function(){applyFilter(btn.dataset.filter);});});
+    catalog.querySelectorAll('[data-rank],.pet-rank-section').forEach(function(sec){var heading=sec.querySelector('h3,h4');if(!heading)return;var rm=heading.textContent.match(/\b(SSS|SS|S|A|B|N)\b/);if(!rm)return;var p=sec.querySelector('.pet-rank-note,.rank-note');if(p)p.textContent='이동형 원본 추가 이동 '+BONUS[rm[1]]+' · 랜덤형 +0회 · 실제 이동 상한 적용';});
+    var base=window.ourRpgPetRoll;if(typeof base==='function'&&!base.__typeWrapped){var wrapped=function(){var out=base.apply(this,arguments);setTimeout(annotateResult,0);return out;};wrapped.__typeWrapped=true;window.ourRpgPetRoll=wrapped;}
+    var result=document.getElementById('petResult');if(result){new MutationObserver(annotateResult).observe(result,{childList:true,characterData:true,subtree:true});annotateResult();}
+    return true;
+  }
+  function start(){if(init())return;var tries=0;var timer=setInterval(function(){tries++;if(init()||tries>40)clearInterval(timer);},250);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
