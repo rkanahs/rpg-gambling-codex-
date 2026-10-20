@@ -370,7 +370,7 @@ const initial=slugFromLocation();if(initial){history.replaceState({rpgCodex:true
     button.id='openBattle';button.type='button';button.hidden=true;button.textContent='⚔️ 등장 대상과 전투하기';actions.appendChild(button);
     const sync=()=>{const r=read();button.hidden=!(r&&r.encounterName&&BATTLE_TYPES.has(r.encounter))};
     judge.addEventListener('click',()=>setTimeout(sync,0));
-    button.addEventListener('click',()=>window.postMessage({type:'open-rpg-codex',slug:'our-rpg-monster-battle'},'*'));
+    button.addEventListener('click',()=>pushEmbedded('our-rpg-monster-battle',titleFor('our-rpg-monster-battle')));
     sync();
   }
   function battle(doc){
