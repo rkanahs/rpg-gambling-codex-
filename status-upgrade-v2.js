@@ -36,7 +36,7 @@
     sections.forEach((section,index)=>{
       const head=section.querySelector('.section-head');
       if(!head||head.querySelector('.su-toggle'))return;
-      const button=d.createElement('button');const form=d.getElementById('form')||d.querySelector('.form');
+      const button=d.createElement('button');const form=d.getElementById('form')||d.querySelector('.form')const form=d.getElementById('form')||d.querySelector('.form');
       button.type='button';button.className='su-toggle';button.textContent='접기';button.setAttribute('aria-expanded','true');
       button.addEventListener('click',()=>{const off=section.classList.toggle('su-collapsed');button.textContent=off?'펼치기':'접기';button.setAttribute('aria-expanded',String(!off))});
       head.appendChild(button);section.dataset.suIndex=String(index);
