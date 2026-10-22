@@ -1,0 +1,1 @@
+(function(){function go(){var f=document.getElementById("embeddedFrame");function run(){try{var d=f&&f.contentDocument,x=d&&d.getElementById("form");if(x)x.classList.add("form")}catch(e){}}if(f){f.addEventListener("load",function(){setTimeout(run,0)});run()}}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",go,{once:true}):go()})();
