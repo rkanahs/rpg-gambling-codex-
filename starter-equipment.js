@@ -21,3 +21,25 @@ panel.querySelector("#equipRecommended").addEventListener("click",()=>{const job
 function install(){const frame=document.getElementById("embeddedFrame");if(!frame)return;const run=()=>{try{const d=frame.contentDocument;if(d&&d.getElementById("status-section-03")){render(d);const form=d.getElementById("form");if(form&&!form.dataset.starterWatch){form.dataset.starterWatch="1";new MutationObserver(()=>render(d)).observe(form,{childList:true})}}}catch(_){}};frame.addEventListener("load",()=>setTimeout(run,0));setTimeout(run,0)}
 document.readyState==="loading"?document.addEventListener("DOMContentLoaded",install,{once:true}):install();
 })();
+
+
+;(function(){
+"use strict";
+const K="our-rpg-inventory-v1",P="our-rpg-player-profiles-v2";
+const I=[
+["p1","🧪","초급 회복 물약",10,"체력 20% 회복"],
+["p2","⚗️","중급 회복 물약",25,"체력 40% 회복"],
+["p3","🍷","상급 회복 물약",60,"체력 70% 회복"],
+["clean","💠","상태 회복 물약",40,"일반 상태이상 1개 해제"],
+["return","📜","귀환서",50,"전투 밖에서 마지막 안전 마을로 귀환"]];
+function rd(k,f){try{return JSON.parse(localStorage.getItem(k)||"")||f}catch(_){return f}}
+function act(){let s=rd(P,null);return s&&s.profiles&&(s.profiles.find(x=>x.id===s.activeId)||s.profiles[0])}
+function data(p){let a=rd(K,{}),k=p.id||p.data.characterName,b=a[k]||(a[k]={items:{},logs:[]});return{a,b}}
+function make(d){let sec=d.getElementById("status-section-03");if(!sec||d.getElementById("rpgInventory"))return;let p=act(),w=d.createElement("div");w.id="rpgInventory";w.innerHTML='<div class="ih"><div><b>🎒 인벤토리 · 소모품 상점</b><small>구매하면 실버가 자동 차감되고 현황표에 저장돼.</small></div><span>'+(p?(p.data.characterName||"이름 미정"):"캐릭터를 먼저 저장해 줘")+'</span></div><div class="shop">'+I.map(x=>'<article><i>'+x[1]+'</i><div><b>'+x[2]+'</b><small>'+x[4]+'</small><strong>'+x[3]+' 실버</strong></div><label>수량 <select><option>1</option><option>5</option><option>10</option></select></label><button type="button" data-buy="'+x[0]+'">구매</button></article>').join("")+'</div><h4>내 소모품</h4><div id="owned"></div><p id="invMsg" role="status"></p>';sec.querySelector(".body").appendChild(w);
+let s=d.createElement("style");s.textContent='#rpgInventory{border:1px solid #385247;background:#101b17;padding:14px;margin-top:14px}.ih{display:flex;justify-content:space-between;gap:10px}.ih b{display:block;color:#f0cf7c;font-size:17px}.ih small,article small{display:block;color:#9eb0a8}.ih>span{color:#7dd5a5;font-weight:800}.shop{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.shop article{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;border:1px solid #2e463c;background:#13211c;padding:10px}.shop i{font-style:normal;font-size:25px}.shop strong{display:block;color:#7dd5a5}.shop label{font-size:11px;color:#9eb0a8}.shop select{background:#0c1512;color:white}.shop button,.slot button{min-height:38px;border:1px solid #80682f;background:#2d2518;color:#f6dfa5;font-weight:850}.slot{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px solid #273a32;padding:8px 0}.slot em{font-style:normal;color:#7dd5a5;font-weight:900}.slot button{padding:4px 10px}#invMsg{min-height:22px;color:#7dd5a5;font-weight:800}@media(max-width:760px){.shop{grid-template-columns:1fr}.ih{flex-direction:column}.shop article{grid-template-columns:auto 1fr}.shop label,.shop button{grid-column:auto}.shop button{min-width:80px}}';d.head.appendChild(s);
+function draw(){let p=act(),o=d.getElementById("owned");if(!p){o.textContent="저장된 캐릭터가 없어.";return}let b=data(p).b;o.innerHTML=I.map(x=>{let n=Number(b.items[x[0]]||0);return '<div class="slot"><b>'+x[1]+' '+x[2]+'</b><em>'+n+'개</em><button type="button" data-use="'+x[0]+'" '+(n?'':'disabled')+'>사용</button></div>'}).join("")}
+function msg(t,bad){let m=d.getElementById("invMsg");m.textContent=t;m.style.color=bad?"#ff8b8b":"#7dd5a5"}
+w.addEventListener("click",e=>{let q=e.target.closest("[data-buy]"),u=e.target.closest("[data-use]"),p=act();if(!p)return msg("먼저 캐릭터 현황표를 저장해 줘.",1);if(q){let x=I.find(a=>a[0]===q.dataset.buy),n=Number(q.parentElement.querySelector("select").value),api=window.OurRpgWallet;if(!api)return msg("자동 지갑을 불러오지 못했어. 새로고침해 줘.",1);let tx=api.change(p.data.characterName,-x[3]*n*100,"상점 구매 · "+x[2]+" ×"+n,"SHOP-"+Date.now());if(!tx.ok)return msg(tx.message,1);let z=data(p);z.b.items[x[0]]=Number(z.b.items[x[0]]||0)+n;z.b.logs.unshift({type:"구매",item:x[2],quantity:n,at:new Date().toISOString()});z.b.logs=z.b.logs.slice(0,100);localStorage.setItem(K,JSON.stringify(z.a));draw();msg("✓ "+x[2]+" "+n+"개 구매 · "+x[3]*n+"실버 자동 차감")}if(u){let x=I.find(a=>a[0]===u.dataset.use),z=data(p),n=Number(z.b.items[x[0]]||0);if(!n)return;if(!confirm(x[2]+" 1개를 사용할까?\n효과: "+x[4]))return;z.b.items[x[0]]=n-1;z.b.logs.unshift({type:"사용",item:x[2],quantity:1,at:new Date().toISOString()});localStorage.setItem(K,JSON.stringify(z.a));draw();msg("✓ "+x[2]+" 사용 · "+x[4])}});draw()}
+function go(){let f=document.getElementById("embeddedFrame"),r=()=>{try{make(f.contentDocument)}catch(_){}};if(f){f.addEventListener("load",()=>setTimeout(r,20));setTimeout(r,20)}}
+document.readyState==="loading"?document.addEventListener("DOMContentLoaded",go,{once:true}):go();
+})();
