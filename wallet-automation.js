@@ -35,3 +35,5 @@ function current(){const f=document.getElementById("embeddedFrame");try{if(f?.co
 document.addEventListener("DOMContentLoaded",()=>{const f=document.getElementById("embeddedFrame");if(f)f.addEventListener("load",current);current()});
 window.OurRpgWallet={format,parseMoney,change};
 })();
+
+(()=>{if(document.querySelector('script[data-story-codex]'))return;const s=document.createElement('script');s.src='story-codex.js?v=20261024-story1';s.defer=true;s.dataset.storyCodex='1';document.head.appendChild(s)})();
