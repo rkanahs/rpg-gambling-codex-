@@ -142,8 +142,9 @@
     let panel = doc.getElementById("rpgInventory");
     if (!panel) {
       panel = doc.createElement("div");
-      section.querySelector(".body")?.appendChild(panel);
     }
+    const sectionBody = section.querySelector(".body") || section;
+    if (panel.parentElement !== sectionBody) sectionBody.appendChild(panel);
     panel.id = "rpgInventory";
     panel.className = "village-shop";
     panel.dataset.villageShop = "1";
