@@ -40,3 +40,5 @@
 })();
 
 (()=>{if(document.querySelector('script[data-story-codex]'))return;const s=document.createElement('script');s.src='story-codex.js?v=20261024-story1';s.defer=true;s.dataset.storyCodex='1';document.head.appendChild(s)})();
+
+setTimeout(()=>{const s=document.querySelector('script[data-story-codex]');if(s){delete window.__storyCodex;s.src='story-codex.js?v=20261024-story2'}},50);
