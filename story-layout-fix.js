@@ -16,10 +16,9 @@
       card.dataset.storyCard = '1';
       grid.prepend(card);
     }
-    card.href = 'our-rpg-story-codex/';
+    card.href = 'our-rpg-story-codex/index.html';
     card.innerHTML = '<span class="icon">📖</span><h3>세계 이야기 도감</h3><p>왕실 소환, 신의 종족 축복, 사라진 전 용사와 보스 부활 이야기</p><small>도감 열기 →</small>';
 
-    // 본문에 중복으로 붙던 긴 스토리는 없애고 독립 도감으로만 제공한다.
     if (story) story.remove();
     return true;
   }
