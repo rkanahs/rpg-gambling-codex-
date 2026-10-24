@@ -579,12 +579,12 @@ window.ourRpgPetRoll=function(){const MK='our-rpg-last-movement-result-v1',SK='o
 
 <script id="fighter-fatigue-patch-20261023">(()=>{const old=document.querySelector('#combat-skills-bridge-20261023');if(!old)return;let s=old.textContent;s=s.replace("if(!d||d.querySelector('#combatSkill'))return;","if(!d)return;d.querySelector('.cs')?.remove();").replace('let A=[],PD=null,R=0,CD={};','let A=[],PD=null,R=0,CD={},F=0;').replace("if((CD[s.id]||0)>R)return toast('쿨타임 '+(CD[s.id]-R)+'턴 남았어.');R++;const base=","const fighter=s.family==='격투가';if(!fighter&&(CD[s.id]||0)>R)return toast('쿨타임 '+(CD[s.id]-R)+'턴 남았어.');R++;const base=").replace('base*ratio(s)*mb-S.m.def*.5','base*ratio(s)*mb*(fighter?1-Math.min(5,F)*.1:1)-S.m.def*.5').replace('const t=turns(s);if(t)CD[s.id]=R+t;finish();show();',"if(fighter){F++;add('🥊 격투 피로 '+Math.min(5,F)+'단계 · 다음 격투가 기술 피해 '+Math.round((1-Math.min(5,F)*.1)*100)+'%.','warn')}else{const t=turns(s);if(t)CD[s.id]=R+t}finish();show();").replace('R=0;CD={};load();show()','R=0;CD={};F=0;load();show()');Function(s)()})();</script>
 
-<script defer src="boss-material-upgrade.js?v=20261024-bossfusion23"></script>
-<script defer src="story-codex.js?v=20261024-story2"></script>
-<script defer src="story-layout-fix.js?v=20261024-startworld"></script>
 
-<script defer src="boss-material-upgrade.js?v=20261024-unique"></script>
+<script defer src="story-codex.js?v=20261025-manual"></script>
+<script defer src="story-layout-fix.js?v=20261025-manual"></script>
 
-<script defer src="boss-material-upgrade.js?v=20261024-unique2"></script>
 
-<script defer src="human-hero-route.js?v=20261025-hero"></script>
+
+
+
+<script defer src="boss-material-upgrade.js?v=20261025-craft-only"></script>
