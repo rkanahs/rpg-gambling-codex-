@@ -93,6 +93,7 @@
     data.distance = resultTotal || (previous + moved);
     data.region = statusRegion(move.region);
     data.lastMovement = [move.at || new Date().toISOString(), "+" + moved, move.encounter || "결과 미기록"].join(" · ");
+    move.characterId = profile.id;
     move.character = data.characterName || data.playerName || move.character || "";
     write(PROFILE_KEY, store);
     write(MOVE_KEY, move);
