@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  function regionLevelExp(region){const r=String(region||'');return r.includes('경계')||r==='boundary'?5900:r.includes('대륙')||r==='continent'?1000:500}
+
+
   const PROFILE_KEY = "our-rpg-player-profiles-v2";
   const MOVE_KEY = "our-rpg-last-movement-result-v1";
   const APPLIED_KEY = "our-rpg-movement-profile-applied-v1";
@@ -92,6 +95,7 @@
     const moved = number(move.distance != null ? move.distance : move.moved);
     data.distance = resultTotal || (previous + moved);
     data.region = statusRegion(move.region);
+    data.expNeeded = String(regionLevelExp(data.region));
     data.lastMovement = [move.at || new Date().toISOString(), "+" + moved, move.encounter || "결과 미기록"].join(" · ");
     move.characterId = profile.id;
     move.character = data.characterName || data.playerName || move.character || "";
