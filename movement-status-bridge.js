@@ -58,7 +58,7 @@
     const data = profile?.data || {};
     const name = String(data.petName || "").trim();
     const effect = name ? String(data.petEffect || "") : "";
-    const signature = JSON.stringify([profile?.id || "", name, effect]);
+    const signature = JSON.stringify([profile?.id || "", name, effect, data.petGrade || "", data.petType || ""]);
     if (doc.movementPetSignature === signature) return;
     doc.movementPetSignature = signature;
     const active = doc.getElementById("petActive");
@@ -70,8 +70,14 @@
     if (fields) fields.hidden = !name;
     if (petName) petName.value = name;
     if (petEffect) petEffect.value = effect;
-    // A pet's descriptive effect alone does not specify a movement multiplier.
-    if (rate) rate.value = "100";
+    const match = effect.match(/(?:이동거리|이동 거리|이동)(?:\s*(?:증가|보정))?\s*\+\s*(\d+(?:\.\d+)?)\s*%/);
+    if (rate) rate.value = String(match ? 100 + Number(match[1]) : 100);
+    const randomNames = new Set(['행운 햄스터','도굴 두더지','동전 고양이','보물 미믹 새끼','장난꾸러기 여우','무지개 새','운명의 슬라임','황금 고블린 새끼','신비한 알','무지개 정령','운명의 정령','보물 정령','행운의 용','혼돈의 정령왕','기적의 별짐승','운명을 굴리는 자']);
+    const grade = String(data.petGrade || '').trim().toUpperCase();
+    const extras = name && !randomNames.has(name) && !String(data.petType || '').includes('랜덤') ? Math.min(2, ({N:1,B:2,A:3,S:5,SS:10,SSS:20})[grade] || 0) : 0;
+    doc.movementPet = { name, effect, extras, rate: match ? 100 + Number(match[1]) : 100 };
+    const summary = doc.getElementById('petMovementSummary');
+    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? ' · 수치 없는 고유 효과는 운영자 판정 필요' : '');
   }
 
   function loadProfile(doc, preserveRegion = false) {
