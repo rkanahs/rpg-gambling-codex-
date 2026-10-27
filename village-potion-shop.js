@@ -70,10 +70,10 @@
   }
 
   function inventory(profile) {
-    const all = read(INVENTORY_KEY, {});
-    const key = profile.id || profile.data.characterName;
-    const bag = all[key] || (all[key] = { items: {}, logs: [] });
-    return { all, bag };
+    const api = window.RpgPotionInventory;
+    if (!api) throw Error("포션 인벤토리를 불러오지 못했어. 최신본을 불러와 줘.");
+    const c = api.context(profile.id);
+    return { all: c.store, bag: c.bag };
   }
 
   function regionSelect(doc) {
@@ -115,8 +115,7 @@
   const ALL_ITEMS = itemMap();
 
   function saveInventory(all) {
-    localStorage.setItem(INVENTORY_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event("storage"));
+    window.RpgPotionInventory.save(all);
   }
 
   function addStyle(doc) {

@@ -1,0 +1,19 @@
+(()=>{'use strict';
+const KEY='our-rpg-player-profiles-v2',LEGACY='our-rpg-inventory-v1';
+const rows=[
+['plain-small-heal','작은 회복 물약','heal',20,'HP 20 회복'],['plain-antidote','초급 해독제','poison',1,'중독 1개 제거'],['plain-guard','견습 방어 물약','buff',{def:10},'전투 종료까지 방어력 +10%'],['plain-agility','민첩 물약','buff',{spd:10},'전투 종료까지 이속 +10%'],
+['continent-medium-heal','중형 회복 물약','healPercent',25,'최대 HP 25% 회복'],['continent-cleanse','종합 해독제','cleanse',1,'해제 가능한 일반 상태이상 1개 제거'],['continent-power','전투 강화 물약','buff',{atk:15,mag:15},'전투 종료까지 공격력·마력 +15%'],['continent-guard','수호 물약','buff',{def:20},'전투 종료까지 방어력 +20%'],['continent-speed','신속 물약','buff',{spd:20},'전투 종료까지 이속 +20%'],
+['border-large-heal','대형 회복 물약','healPercent',45,'최대 HP 45% 회복'],['border-cleanse','고급 정화 물약','cleanse',Infinity,'해제 가능한 일반 상태이상 전부 제거'],['border-hero','영웅의 물약','buff',{atk:25,mag:25},'전투 종료까지 공격력·마력 +25%'],['border-fortress','철벽 물약','buff',{def:30},'전투 종료까지 방어력 +30%'],['border-ultraspeed','초신속 물약','buff',{spd:30},'전투 종료까지 이속 +30%'],['border-full-heal','완전 회복 물약','fullHeal',100,'HP를 최대치까지 회복 · 부활 불가 · 전투당 1회'],
+['p1','초급 회복 물약','healPercent',20,'최대 HP 20% 회복'],['p2','중급 회복 물약','healPercent',40,'최대 HP 40% 회복'],['p3','상급 회복 물약','healPercent',70,'최대 HP 70% 회복'],['clean','상태 회복 물약','cleanse',1,'해제 가능한 일반 상태이상 1개 제거'],['codex-heal','회복 물약','heal',100,'HP 100 회복'],['codex-large-heal','큰 회복 물약','heal',500,'HP 500 회복'],['codex-antidote','해독 물약','poison',1,'중독 1개 제거'],['codex-cleanse','정화 물약','cleanse',1,'해제 가능한 일반 상태이상 1개 제거']];
+const catalog=Object.fromEntries(rows.map(([id,name,kind,value,effect])=>[id,{id,name,kind,value,effect}]));
+function read(k,f){try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}}
+function amount(n){return Number.isSafeInteger(Number(n))&&Number(n)>0?Number(n):0}
+function bagFor(profile){const d=profile.data;if(!d.potionBag||d.potionBag.version!==1){const legacy=read(LEGACY,{})[profile.id||d.characterName]||{};d.potionBag={version:1,items:{...(legacy.items||{})},logs:Array.isArray(legacy.logs)?legacy.logs.slice():[],chestImports:{}}}const bag=d.potionBag;bag.items=bag.items||{};bag.logs=Array.isArray(bag.logs)?bag.logs:[];bag.chestImports=bag.chestImports||{};
+ const lines={};for(const line of String(d.consumables||'').split('\n'))if(/^\[(?:일반 보물상자|희귀 보물상자|전설 보물상자|보스 상자)\]/.test(line))lines[line]=(lines[line]||0)+1;
+ for(const [line,count]of Object.entries(lines)){const fresh=count-amount(bag.chestImports[line]);if(fresh>0){let text=line;for(const item of Object.values(catalog).sort((a,b)=>b.name.length-a.name.length)){if(text.includes(item.name)){const tail=text.slice(text.indexOf(item.name)+item.name.length),q=Number(tail.match(/^\s*[×x]\s*(\d+)/)?.[1]||1);bag.items[item.id]=amount(bag.items[item.id])+q*fresh;text=text.split(item.name).join('')}}bag.chestImports[line]=count}}
+ return bag}
+function context(owner){const store=read(KEY,null),p=store?.profiles?.find(x=>x.id===store.activeId)||store?.profiles?.[0];if(!p||owner&&p.id!==owner)throw Error('포션을 사용할 캐릭터를 현황표에서 선택해 줘.');return{store,profile:p,bag:bagFor(p)}}
+function save(store){localStorage.setItem(KEY,JSON.stringify(store));try{globalThis.dispatchEvent?.(new CustomEvent('our-rpg:profiles-updated'));globalThis.dispatchEvent?.(new StorageEvent('storage',{key:KEY,newValue:JSON.stringify(store)}))}catch(_){}}
+function consume(owner,id,apply){const c=context(owner),item=catalog[id];if(!item)throw Error('이 소모품은 전투용 포션이 아니야.');const count=amount(c.bag.items[id]);if(!count)throw Error('보유한 포션이 없어.');const result=apply(c.profile.data,item);c.bag.items[id]=count-1;c.bag.logs.unshift({type:'사용',item:item.name,quantity:1,at:new Date().toISOString()});c.bag.logs=c.bag.logs.slice(0,100);c.profile.updatedAt=new Date().toISOString();save(c.store);return{item,result}}
+globalThis.RpgPotionInventory=Object.freeze({catalog,context,bagFor,save,consume});
+})();
