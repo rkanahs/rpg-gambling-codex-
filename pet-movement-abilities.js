@@ -1,0 +1,33 @@
+(()=>{'use strict';
+const RULES=Object.freeze({
+ '밤올빼미':{chance:5,kind:'hidden',text:'이동마다 5%로 숨겨진 것(???) 발견'},
+ '보물 사냥개':{chance:10,kind:'chest',text:'상자 외 결과에서 10%로 해당 지역 보물상자 발견'},
+ '세계수의 정령':{chance:10,kind:'chest',text:'상자 외 결과에서 10%로 해당 지역 보물상자 발견'},
+ '보물 미믹 새끼':{chance:10,kind:'extraChest',text:'이동마다 10%로 해당 지역 보물상자 1개 추가 발견'},
+ '보물 정령':{chance:5,kind:'extraChest',text:'이동마다 5%로 해당 지역 보물상자 1개 추가 발견'},
+ '도굴 두더지':{chance:10,kind:'item',text:'이동마다 10%로 일반 몬스터의 초급 장비 1개 발견'},
+ '행운의 용':{chance:5,kind:'upgrade',text:'5%로 일반→희귀 몬스터 또는 일반→희귀→전설 상자 한 단계 향상(지역에 존재하는 결과만)'}
+});
+const names={normal:'일반 보물상자',rare:'희귀 보물상자',legend:'전설 보물상자'},types=Object.fromEntries(Object.entries(names).map(([k,v])=>[v,k]));
+function random(n){const a=new Uint32Array(1),limit=Math.floor(4294967296/n)*n;do crypto.getRandomValues(a);while(a[0]>=limit);return a[0]%n}
+function resolve({petName,enabled,encounter,rows}){const rule=enabled&&RULES[petName];if(!rule)return{encounter,petAbility:null};let target='';
+ if(rule.kind==='hidden')target=rows.some(x=>x[0]==='???')?'???':'';
+ if(rule.kind==='upgrade'){const next={'일반 몬스터':'희귀 몬스터','일반 보물상자':'희귀 보물상자','희귀 보물상자':'전설 보물상자'}[encounter];target=rows.some(x=>x[0]===next)?next:'';}
+ if(rule.kind==='chest'&&types[encounter]||['hidden','upgrade'].includes(rule.kind)&&!target)return{encounter,petAbility:{petName,...rule,eligible:false,triggered:false,summary:petName+' · 현재 결과에 적용 대상 없음'}};
+ const roll=random(100)+1,triggered=roll<=rule.chance,ability={petName,...rule,roll,triggered,eligible:true,originalEncounter:encounter};
+ if(triggered&&['chest','extraChest'].includes(rule.kind)){const pool=rows.filter(x=>types[x[0]]),total=pool.reduce((a,x)=>a+Math.round(x[1]*10),0);if(!total)throw Error('지역 상자 확률표를 찾을 수 없어.');let ticket=random(total)+1;for(const[n,p]of pool){ticket-=Math.round(p*10);if(ticket<=0){target=n;break}}ability.chestType=types[target];}
+ if(triggered&&rule.kind==='item'){ability.item=globalThis.RpgOrdinaryChests?.petItem?.('pending-pet-item');if(!ability.item)throw Error('펫 발견 장비 목록을 불러오지 못했어.');}
+ if(triggered&&['hidden','chest','upgrade'].includes(rule.kind))encounter=target;
+ ability.summary=petName+' · D100 '+roll+' / '+rule.chance+' 이하 발동 · '+(triggered?rule.kind==='extraChest'?'추가 '+target+' 1개 발견':rule.kind==='item'?'초급 장비 1개 발견':encounter+' 적용':'미발동');
+ return{encounter,petAbility:ability};
+}
+function apply(profile,move){const d=profile.data,a=move.petAbility;if(!a||!a.triggered)return;const receipts=Array.isArray(d.petMovementReceipts)?d.petMovementReceipts:[];if(receipts.some(x=>x.id===move.id))return;
+ if(a.kind==='extraChest'){d.petMovementChests=[...(d.petMovementChests||[]),{id:'pet-chest-'+move.id,movementId:move.id,ownerId:profile.id,type:a.chestType,petName:a.petName,at:move.at}];}
+ if(a.kind==='item'){const item=a.item?{...a.item,id:'pet-item-'+move.id}:null;if(!item)throw Error('펫 발견 장비 목록을 불러오지 못했어. 다시 시도해 줘.');let bag=d.equipmentInventory||[];if(typeof bag==='string')bag=JSON.parse(bag||'[]');const room=bag.length<(Number(d.inventoryMax)||20);if(room){bag.push(item);d.equipmentInventory=JSON.stringify(bag);d.inventoryUsed=String(bag.length)}d.petMovementItems=[...(d.petMovementItems||[]),{id:'pet-item-'+move.id,item,petName:a.petName,status:room?'claimed':'pending',at:move.at}];}
+ d.petMovementReceipts=[...receipts,{id:move.id,...a,at:move.at}];
+}
+function claimItem(id){const key='our-rpg-player-profiles-v2',store=JSON.parse(localStorage.getItem(key)||'null'),p=store?.profiles?.find(x=>x.id===store.activeId),entry=p?.data?.petMovementItems?.find(x=>x.id===id);if(!entry)throw Error('해당 캐릭터의 발견 아이템이 없어.');if(entry.status==='claimed')return entry;let bag=p.data.equipmentInventory||[];if(typeof bag==='string')bag=JSON.parse(bag||'[]');if(bag.length>=(Number(p.data.inventoryMax)||20))throw Error('장비 인벤토리를 정리해 줘. 발견 장비는 보관 중이야.');bag.push(entry.item);p.data.equipmentInventory=JSON.stringify(bag);p.data.inventoryUsed=String(bag.length);entry.status='claimed';localStorage.setItem(key,JSON.stringify(store));globalThis.dispatchEvent?.(new CustomEvent('our-rpg:profiles-updated'));return entry;}
+function install(){const doc=document.getElementById('embeddedFrame')?.contentDocument;if(!doc)return;const host=doc.getElementById('petMovementSummary');if(host&&!doc.getElementById('petAbilityRules')){const details=doc.createElement('details');details.id='petAbilityRules';const summary=doc.createElement('summary');summary.textContent='이동 판정 펫 고유 능력 · 자동 발동 기준';details.append(summary);for(const[n,r]of Object.entries(RULES)){const p=doc.createElement('p');p.textContent=n+' · '+r.text;details.append(p)}host.after(details)}
+ const anchor=doc.getElementById('status-section-03')||doc.getElementById('petMovementSummary');if(!anchor)return;let panel=doc.getElementById('petFoundItems');if(!panel){panel=doc.createElement('section');panel.id='petFoundItems';anchor.after(panel)}let p;try{const s=JSON.parse(localStorage.getItem('our-rpg-player-profiles-v2')||'null');p=s?.profiles?.find(x=>x.id===s.activeId)}catch{}panel.replaceChildren();for(const x of p?.data?.petMovementItems||[]){if(x.status!=='pending')continue;const b=doc.createElement('button');b.type='button';b.textContent='🎒 '+x.petName+' 발견: '+x.item.name+' · 인벤토리로 받기';b.onclick=()=>{try{claimItem(x.id);install()}catch(e){b.textContent=e.message}};panel.append(b)}}
+globalThis.RpgPetMovement=Object.freeze({rules:RULES,resolve,apply,claimItem,install});document.getElementById('embeddedFrame')?.addEventListener('load',()=>setTimeout(install,80));globalThis.addEventListener?.('our-rpg:profiles-updated',install);globalThis.addEventListener?.('storage',install);setTimeout(install,150);
+})();

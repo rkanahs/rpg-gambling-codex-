@@ -77,7 +77,7 @@
     const extras = name && !randomNames.has(name) && !String(data.petType || '').includes('랜덤') ? Math.min(2, ({N:1,B:2,A:3,S:5,SS:10,SSS:20})[grade] || 0) : 0;
     doc.movementPet = { name, effect, extras, rate: match ? 100 + Number(match[1]) : 100 };
     const summary = doc.getElementById('petMovementSummary');
-    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? ' · 수치 없는 고유 효과는 운영자 판정 필요' : '');
+    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? (globalThis.RpgPetMovement?.rules[name]?' · 고유 능력 자동 판정':' · 수치 없는 고유 효과는 운영자 판정 필요') : '');
   }
 
   function loadProfile(doc, preserveRegion = false) {
@@ -128,6 +128,7 @@
     move.characterId = profile.id;
     move.character = data.characterName || data.playerName || move.character || "";
     try {
+    globalThis.RpgPetMovement?.apply(profile, move);
     write(PROFILE_KEY, store);
     write(MOVE_KEY, move);
     write(APPLIED_KEY, [...(Array.isArray(applied) ? applied : []), move.id].slice(-100));
