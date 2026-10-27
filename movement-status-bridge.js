@@ -54,9 +54,30 @@
     box.textContent = message;
   }
 
+  function loadPet(doc, profile) {
+    const data = profile?.data || {};
+    const name = String(data.petName || "").trim();
+    const effect = name ? String(data.petEffect || "") : "";
+    const signature = JSON.stringify([profile?.id || "", name, effect]);
+    if (doc.movementPetSignature === signature) return;
+    doc.movementPetSignature = signature;
+    const active = doc.getElementById("petActive");
+    const fields = doc.getElementById("petFields");
+    const petName = doc.getElementById("petName");
+    const petEffect = doc.getElementById("petEffect");
+    const rate = doc.getElementById("petRate");
+    if (active) active.checked = !!name;
+    if (fields) fields.hidden = !name;
+    if (petName) petName.value = name;
+    if (petEffect) petEffect.value = effect;
+    // A pet's descriptive effect alone does not specify a movement multiplier.
+    if (rate) rate.value = "100";
+  }
+
   function loadProfile(doc, preserveRegion = false) {
     const store = read(PROFILE_KEY, null);
     const profile = activeProfile(store);
+    loadPet(doc, profile);
     if (!profile || !profile.data) {
       notice(doc, "현황표에 저장된 캐릭터가 없어. 먼저 플레이어 현황표에서 캐릭터를 저장해 줘.", false);
       return null;
@@ -131,6 +152,9 @@
     }, true);
     window.addEventListener("storage", function (event) {
       if (event.key === PROFILE_KEY && doc.defaultView && !doc.defaultView.closed) loadProfile(doc);
+    });
+    window.addEventListener("our-rpg:profiles-updated", function () {
+      if (doc.defaultView && !doc.defaultView.closed) loadProfile(doc);
     });
   }
 
