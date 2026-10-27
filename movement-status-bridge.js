@@ -54,7 +54,7 @@
     box.textContent = message;
   }
 
-  function loadProfile(doc) {
+  function loadProfile(doc, preserveRegion = false) {
     const store = read(PROFILE_KEY, null);
     const profile = activeProfile(store);
     if (!profile || !profile.data) {
@@ -65,26 +65,27 @@
     const name = doc.getElementById("name");
     const total = doc.getElementById("total");
     const region = doc.getElementById("region");
-    if (name && !name.value.trim()) name.value = data.characterName || data.playerName || "";
+    if (name) name.value = data.characterName || data.playerName || "";
     if (total) total.value = String(number(data.distance));
-    if (region) {
+    if (region && (!preserveRegion || doc.movementProfileId !== profile.id)) {
       region.value = formRegion(data.region);
       region.dispatchEvent(new Event("change", { bubbles: true }));
     }
+    doc.movementProfileId = profile.id;
     notice(doc, (data.characterName || data.playerName || "현재 캐릭터") + "의 현황을 불러왔어. 이동 판정이 끝나면 누적 거리와 지역이 자동 저장돼.", true);
     return profile;
   }
 
-  function saveMovement(doc) {
+  function saveMovement(doc, previousId, ownerId) {
     const move = read(MOVE_KEY, null);
-    if (!move || !move.id) return;
+    if (!move || !move.id || move.id === previousId) return;
     const applied = read(APPLIED_KEY, []);
     if (Array.isArray(applied) && applied.includes(move.id)) {
       notice(doc, "이 이동은 이미 현황표에 기록되어 있어. 중복으로 더하지 않았어.", false);
       return;
     }
     const store = read(PROFILE_KEY, null);
-    const profile = activeProfile(store);
+    const profile = store?.profiles?.find(p => p && p.id === ownerId);
     if (!profile || !profile.data) {
       notice(doc, "이동 결과는 나왔지만 저장할 캐릭터 현황표가 없어.", false);
       return;
@@ -93,15 +94,22 @@
     const previous = number(data.distance);
     const resultTotal = number(move.currentCoordinate);
     const moved = number(move.distance != null ? move.distance : move.moved);
-    data.distance = resultTotal || (previous + moved);
+    data.distance = Number.isFinite(Number(move.currentCoordinate)) ? resultTotal : (previous + moved);
     data.region = statusRegion(move.region);
     data.expNeeded = String(regionLevelExp(data.region));
     data.lastMovement = [move.at || new Date().toISOString(), "+" + moved, move.encounter || "결과 미기록"].join(" · ");
     move.characterId = profile.id;
     move.character = data.characterName || data.playerName || move.character || "";
+    try {
     write(PROFILE_KEY, store);
     write(MOVE_KEY, move);
     write(APPLIED_KEY, [...(Array.isArray(applied) ? applied : []), move.id].slice(-100));
+    } catch (_) {
+      notice(doc, "이동 현황 저장에 실패했어. 저장 공간을 확인해 줘.", false);
+      return;
+    }
+    const total = doc.getElementById("total");
+    if (total) total.value = String(data.distance);
     window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
     notice(doc, "✓ " + (move.character || "현재 캐릭터") + " 현황에 기록 완료 · 누적 이동거리 " + data.distance.toLocaleString("ko-KR") + " · " + data.region, true);
   }
@@ -111,8 +119,18 @@
     if (!judge || judge.dataset.statusBridge === "1") return;
     judge.dataset.statusBridge = "1";
     loadProfile(doc);
-    judge.addEventListener("click", function () {
-      setTimeout(function () { saveMovement(doc); }, 0);
+    judge.addEventListener("click", function (event) {
+      const profile = loadProfile(doc, true);
+      if (!profile) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      const previousId = read(MOVE_KEY, null)?.id;
+      setTimeout(function () { saveMovement(doc, previousId, profile.id); }, 0);
+    }, true);
+    window.addEventListener("storage", function (event) {
+      if (event.key === PROFILE_KEY && doc.defaultView && !doc.defaultView.closed) loadProfile(doc);
     });
   }
 
