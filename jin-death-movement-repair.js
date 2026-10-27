@@ -1,0 +1,5 @@
+(()=>{'use strict';
+const KEY='our-rpg-player-profiles-v2',OWNER='b9d23c2d-4ab6-4112-b7c1-d31733e3c8d0',REPAIR='jin-death-distance-reset-20261027-01';let running=false;
+function repair(){if(running)return false;running=true;try{const store=JSON.parse(localStorage.getItem(KEY)||'null'),p=store?.profiles?.find(x=>x.id===OWNER);if(!p?.data||p.data.movementRepairReceipts?.some(x=>x.id===REPAIR))return false;const d=p.data,at=new Date().toISOString();const receipt={id:REPAIR,at,before:d.distance??'0',after:'0',reason:'사망 후 이동거리 초기화 요청'};d.distance='0';d.movementRepairReceipts=[...(Array.isArray(d.movementRepairReceipts)?d.movementRepairReceipts:[]),receipt];d.lastMovement=at+' · 사망 후 이동거리 복구 · 0부터 다시 시작';p.updatedAt=at;localStorage.setItem(KEY,JSON.stringify(store));globalThis.dispatchEvent?.(new CustomEvent('our-rpg:profiles-updated',{detail:{characterId:OWNER}}));globalThis.dispatchEvent?.(new StorageEvent('storage',{key:KEY,newValue:JSON.stringify(store)}));return true}catch{return false}finally{running=false}}
+globalThis.addEventListener?.('storage',e=>{if(e.key===KEY)repair()});globalThis.addEventListener?.('our-rpg:profiles-updated',repair);repair();
+})();
