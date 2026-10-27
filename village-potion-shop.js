@@ -248,7 +248,8 @@
         if (!doc || !(doc.getElementById("status-section-05") || doc.getElementById("status-section-03"))) return;
         const select = regionSelect(doc);
         const profile = activeProfile();
-        const signature = `${profile?.id || ""}|${select?.value || profile?.data?.region || ""}`;
+        const bag = profile ? inventory(profile).bag : null;
+        const signature = JSON.stringify([profile?.id || "", select?.value || profile?.data?.region || "", bag?.items || {}, (bag?.logs || []).slice(0, 5)]);
         const panel = doc.getElementById("rpgInventory");
         if (signature !== lastSignature || !panel || panel.dataset.villageShop !== "1") {
           lastSignature = signature;
@@ -257,6 +258,8 @@
       } catch (_) {}
     };
     frame.addEventListener("load", () => setTimeout(run, 80));
+    window.addEventListener("our-rpg:profiles-updated", run);
+    window.addEventListener("storage", run);
     setInterval(run, 700);
     setTimeout(run, 80);
   }
