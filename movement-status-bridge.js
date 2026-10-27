@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  function regionLevelExp(region){const r=String(region||'');return r.includes('경계')||r==='boundary'?5900:r.includes('대륙')||r==='continent'?1000:500}
+  function regionLevelExp(region){const r=String(region||'');return r.includes('경계')||r==='boundary'?30000:r.includes('대륙')||r==='continent'?1000:500}
 
 
   const PROFILE_KEY = "our-rpg-player-profiles-v2";
