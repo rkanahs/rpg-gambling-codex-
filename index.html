@@ -314,7 +314,7 @@ function decodeRawPage(value){
 function decodePage(value){
   const html=decodeRawPage(value);
   const bridge='<scr'+'ipt>(function(){document.addEventListener("click",function(event){var link=event.target.closest("a[href]");if(!link)return;var match=link.getAttribute("href").match(/^\.\.\/([^/]+)\/?/);if(match){event.preventDefault();parent.postMessage({type:"open-rpg-codex",slug:match[1]},"*")}});document.addEventListener("keydown",function(event){if(event.key==="Escape")parent.postMessage({type:"close-rpg-codex"},"*")},true);})();</scr'+'ipt>';
-  return html.replace(/<\/body>/i,bridge+'<script src="event-boost-status.js?v=20261028-six-events"></script><script src="live-events.js?v=20261028-server-events"></script></body>');
+  return html.replace(/<\/body>/i,bridge+'</body>');
 }
 function portalUrl(){const url=new URL(location.href);url.hash='';return url.href}
 function codexUrl(slug){const url=new URL(location.href);url.hash=allowedSlug(slug);return url.href}
