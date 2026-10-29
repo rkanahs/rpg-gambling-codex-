@@ -358,7 +358,7 @@ addEventListener('popstate',routeFromHistory);
 document.addEventListener('keydown',function(event){if(event.key==='Escape'&&embeddedViewer.classList.contains('open')){event.preventDefault();returnToPortal();return}if(event.key!=='Tab'||!embeddedViewer.classList.contains('open'))return;const focusable=[...embeddedViewer.querySelectorAll('button:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])')].filter(function(el){return !el.hidden});if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});
 const initial=slugFromLocation();if(initial){history.replaceState({rpgCodex:true,rpgCodexSlug:initial,rpgCodexDepth:0},'',codexUrl(initial));renderEmbedded(initial,titleFor(initial))}else history.replaceState({rpgPortal:true},'',location.href);
 </script><script src="event-boost-status.js?v=20261028-six-events"></script><script src="live-events.js?v=20261028-server-events"></script><script src="player-duels.js?v=20261029-pvp-entry"></script>
-<script defer src="pet-ownership-grants.js?v=20261030-jin-fighter-gear"></script><script defer src="pet-noncombat-auto.js?v=20261029-hp2-auto"></script></body>
+<script defer src="pet-ownership-grants.js?v=20261030-easy-pet-effects"></script><script defer src="pet-noncombat-auto.js?v=20261029-hp2-auto"></script></body>
 </html>
 
 	<script id="movement-battle-bridge">
