@@ -218,16 +218,18 @@
       }
       if (use) {
         const item = ALL_ITEMS[use.dataset.vsUse] || [use.dataset.vsUse, "📦", use.dataset.vsUse, 0, "효과는 운영자에게 확인"];
-        const data = inventory(active);
-        const count = Number(data.bag.items[item[0]] || 0);
-        if (!count) return;
+        const owner = active.id;
         if (!confirm(`${item[2]} 1개를 사용할까?\n효과: ${item[4]}`)) return;
-        data.bag.items[item[0]] = count - 1;
-        data.bag.logs.unshift({ type: "사용", item: item[2], quantity: 1, at: new Date().toISOString() });
-        data.bag.logs = data.bag.logs.slice(0, 100);
-        saveInventory(data.all);
-        drawOwned();
-        message(`✓ ${item[2]} 사용 · ${item[4]}`);
+        try {
+          const api = window.RpgPotionInventory;
+          if (!api?.useOutsideBattle) throw Error("최신본 다시 불러오기를 눌러 줘.");
+          const out = api.useOutsideBattle(owner, item[0]);
+          render(doc);
+          const box = doc.getElementById("rpgInventory")?.querySelector("#invMsg");
+          if (box) box.textContent = `✓ ${out.item.name} 사용 · HP ${out.result.before} → ${out.result.after} / ${out.result.max} (+${out.result.healed})`;
+        } catch (error) {
+          message(`사용하지 못했어 · ${error.message || "저장 오류. 잠시 후 다시 시도해 줘."}`, true);
+        }
       }
     };
 
