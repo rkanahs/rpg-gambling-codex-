@@ -58,7 +58,7 @@
     const data = profile?.data || {};
     const name = String(data.petName || "").trim();
     const effect = name ? String(data.petEffect || "") : "";
-    const signature = JSON.stringify([profile?.id || "", name, effect, data.petGrade || "", data.petType || ""]);
+    const signature = JSON.stringify([profile?.id || "", name, effect, data.petGrade || "", data.petType || "", data.petsOwned || []]);
     if (doc.movementPetSignature === signature) return;
     doc.movementPetSignature = signature;
     const active = doc.getElementById("petActive");
@@ -77,7 +77,8 @@
     const extras = name && !randomNames.has(name) && !String(data.petType || '').includes('랜덤') ? Math.min(2, ({N:1,B:2,A:3,S:5,SS:10,SSS:20})[grade] || 0) : 0;
     doc.movementPet = { name, effect, extras, rate: match ? 100 + Number(match[1]) : 100 };
     const summary = doc.getElementById('petMovementSummary');
-    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? (globalThis.RpgPetMovement?.rules[name]?' · 고유 능력 자동 판정':' · 수치 없는 고유 효과는 운영자 판정 필요') : '');
+    doc.defaultView?.renderOdds?.();
+    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? ((globalThis.RpgPetMovement?.rules[name]||globalThis.RpgPetMovement?.encounterRows?.([['일반 몬스터',30],['아무 일 없음',70]],true).ability)?' · 고유 능력 자동 판정':' · 수치 없는 고유 효과는 운영자 판정 필요') : '');
   }
 
   function loadProfile(doc, preserveRegion = false) {
@@ -187,5 +188,3 @@
 })();
 
 
-// Regional encounter odds: normal monsters and no-event are separate in plain/continent; boundary unchanged.
-(()=>{'use strict';const R={"plain":[["아무 일 없음",17.1],["일반 몬스터",30],["일반 보물상자",15],["희귀 보물상자",10],["전설 보물상자",1.0],["희귀 몬스터",12.0],["야생 펫 등장",10],["일반 보스",2.0],["???",2.0],["중간보스 등장",0.7],["최종보스 등장",0.2]],"continent":[["아무 일 없음",15.5],["일반 몬스터",30],["일반 보물상자",10],["희귀 보물상자",5],["전설 보물상자",1.3],["희귀 몬스터",12.8],["야생 펫 등장",15.3],["일반 보스",5.1],["???",2.5],["중간보스 등장",1.9],["최종보스 등장",0.6]],"boundary":[["전설 보물상자",10.5],["희귀 야생 펫 등장",26.3],["???",5.3],["중간보스 등장",31.6],["최종보스 등장",26.3]]};function rnd(n){const a=new Uint32Array(1),l=Math.floor(4294967296/n)*n;do crypto.getRandomValues(a);while(a[0]>=l);return a[0]%n}function patch(){if(typeof activeSlug!=='undefined'&&activeSlug!=='our-rpg-movement-results')return;const f=typeof embeddedFrame!=='undefined'?embeddedFrame:document.querySelector('.embedded-frame'),d=f&&f.contentDocument,w=f&&f.contentWindow;if(!d||!w||!d.querySelector('#region')||!d.querySelector('#odds'))return;w.encounter=r=>{const roll=rnd(1000)+1;let e=0;for(const[n,p]of R[r]){e+=Math.round(p*10);if(roll<=e)return{name:n,roll}}return{name:R[r].at(-1)[0],roll}};const paint=()=>{const a=R[d.querySelector('#region').value];if(a)d.querySelector('#odds').innerHTML=a.map(x=>'<tr><td>'+x[0]+'</td><td>'+x[1]+'%</td></tr>').join('')};if(!d.documentElement.dataset.petOddsUpgrade){d.documentElement.dataset.petOddsUpgrade='separate-no-event-20261027';d.querySelector('#region').addEventListener('change',()=>setTimeout(paint,0))}paint()}const f=document.querySelector('.embedded-frame');if(f)f.addEventListener('load',()=>setTimeout(patch,0));setTimeout(patch,0)})();
