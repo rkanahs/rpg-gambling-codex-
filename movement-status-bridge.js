@@ -64,6 +64,14 @@
     });
   }
 
+  function movementPetData(profile) {
+    const data = profile?.data || {};
+    if (!Object.hasOwn(data, "movementPetName")) return data;
+    const name = String(data.movementPetName || ""), pet = ownedPets(profile).find(pet => pet.name === name);
+    if (!pet && name && name === data.petName) return data;
+    return { ...data, petName: pet?.name || "", petGrade: pet ? pet.rarity || pet.grade || "" : "", petType: pet?.type || "", petEffect: pet?.effect || "" };
+  }
+
   function escapePet(value) {
     return String(value || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
@@ -77,13 +85,13 @@
     const select = doc.getElementById("movementPetSelect"), button = doc.getElementById("movementPetChange");
     if (!select || !button) return;
     const chosen = select.value;
-    button.disabled = !profile?.data || select.dataset.ownerId !== profile.id || chosen === (profile.data.petName || "") || (chosen !== "" && !ownedPets(profile).some(pet => pet.name === chosen));
+    button.disabled = !profile?.data || select.dataset.ownerId !== profile.id || chosen === (movementPetData(profile).petName || "") || (chosen !== "" && !ownedPets(profile).some(pet => pet.name === chosen));
   }
 
   function renderPetChoices(doc, profile) {
     const select = doc.getElementById("movementPetSelect");
     if (!select) return;
-    const pets = ownedPets(profile), current = profile?.data?.petName || "";
+    const pets = ownedPets(profile), current = movementPetData(profile).petName || "";
     select.innerHTML = '<option value="">동행 해제</option>' +
       (current && !pets.some(pet => pet.name === current) ? '<option value="'+escapePet(current)+'" disabled>'+escapePet(current)+' · 기존 동행</option>' : '') +
       pets.map(pet => '<option value="'+escapePet(pet.name)+'">'+escapePet(pet.name)+(pet.rarity || pet.grade ? ' · '+escapePet(pet.rarity || pet.grade) : '')+'</option>').join('');
@@ -102,12 +110,10 @@
       if (!profile?.data || select.dataset.ownerId !== profile.id) throw Error("캐릭터가 바뀌었어. 펫을 다시 선택해 줘.");
       const name = select.value, chosen = name ? ownedPets(profile).find(pet => pet.name === name) : null;
       if (name && !chosen) throw Error("이 캐릭터가 보유한 펫만 선택할 수 있어.");
-      if ((profile.data.petName || "") === name) return;
+      if ((movementPetData(profile).petName || "") === name) return;
       const data = profile.data;
-      data.petName = chosen?.name || "";
-      data.petGrade = chosen ? chosen.rarity || chosen.grade || "" : "";
-      data.petType = chosen ? chosen.type || (/^HP-[1-5]$/.test(chosen.hiddenPetCode || "") ? "고유 능력형" : "") : "";
-      data.petEffect = chosen?.effect || "";
+      if (!Object.hasOwn(data, "battlePetName")) data.battlePetName = data.petName || "";
+      data.movementPetName = chosen?.name || "";
       profile.updatedAt = new Date().toISOString();
       write(PROFILE_KEY, store);
       saved = true;
@@ -116,7 +122,7 @@
       loadProfile(doc, true);
       window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
       if (typeof CustomEvent === "function") window.dispatchEvent(new CustomEvent("our-rpg:profiles-updated", { detail: { characterId: profile.id, source: "movement-pet-switch" } }));
-      petSwitchMessage(doc, name ? "✓ " + name + " 동행 설정 · 현황표 저장 완료 · 다음 이동부터 적용돼." : "✓ 동행 해제 · 현황표에도 저장했어.");
+      petSwitchMessage(doc, name ? "✓ " + name + " 이동용 설정 · 전투용 펫은 유지 · 다음 이동부터 적용돼." : "✓ 이동용 동행 해제 · 전투용 펫은 그대로야.");
     } catch (error) {
       petSwitchMessage(doc, saved ? "펫은 저장됐어. 이동 결과판을 다시 열어 확인해 줘." : (error.message || "펫 변경을 저장하지 못했어. 다시 시도해 줘."), true);
       if (!saved) { doc.movementPetSignature = ""; loadProfile(doc, true); }
@@ -124,7 +130,7 @@
   }
 
   function loadPet(doc, profile) {
-    const data = profile?.data || {};
+    const data = movementPetData(profile);
     const name = String(data.petName || "").trim();
     const effect = name ? String(data.petEffect || "") : "";
     const signature = JSON.stringify([profile?.id || "", name, effect, data.petGrade || "", data.petType || "", data.petsOwned || []]);
