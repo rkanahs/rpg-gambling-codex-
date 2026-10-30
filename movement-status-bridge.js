@@ -54,6 +54,75 @@
     box.textContent = message;
   }
 
+  function ownedPets(profile) {
+    let pets = profile?.data?.petsOwned;
+    try { if (typeof pets === "string") pets = JSON.parse(pets); } catch (_) { pets = []; }
+    const seen = new Set();
+    return (Array.isArray(pets) ? pets : []).filter(pet => {
+      if (!pet || typeof pet.name !== "string" || !pet.name.trim() || seen.has(pet.name)) return false;
+      seen.add(pet.name); return true;
+    });
+  }
+
+  function escapePet(value) {
+    return String(value || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function petSwitchMessage(doc, text, bad = false) {
+    const box = doc.getElementById("movementPetSwitchNotice");
+    if (box) { box.textContent = text; box.style.color = bad ? "#f09595" : "#7dd5a5"; }
+  }
+
+  function petSwitchButton(doc, profile) {
+    const select = doc.getElementById("movementPetSelect"), button = doc.getElementById("movementPetChange");
+    if (!select || !button) return;
+    const chosen = select.value;
+    button.disabled = !profile?.data || select.dataset.ownerId !== profile.id || chosen === (profile.data.petName || "") || (chosen !== "" && !ownedPets(profile).some(pet => pet.name === chosen));
+  }
+
+  function renderPetChoices(doc, profile) {
+    const select = doc.getElementById("movementPetSelect");
+    if (!select) return;
+    const pets = ownedPets(profile), current = profile?.data?.petName || "";
+    select.innerHTML = '<option value="">동행 해제</option>' +
+      (current && !pets.some(pet => pet.name === current) ? '<option value="'+escapePet(current)+'" disabled>'+escapePet(current)+' · 기존 동행</option>' : '') +
+      pets.map(pet => '<option value="'+escapePet(pet.name)+'">'+escapePet(pet.name)+(pet.rarity || pet.grade ? ' · '+escapePet(pet.rarity || pet.grade) : '')+'</option>').join('');
+    select.value = current;
+    select.dataset.ownerId = profile?.id || "";
+    select.disabled = !profile;
+    petSwitchButton(doc, profile);
+  }
+
+  function switchMovementPet(doc) {
+    const select = doc.getElementById("movementPetSelect");
+    if (!select) return;
+    let saved = false;
+    try {
+      const store = read(PROFILE_KEY, null), profile = activeProfile(store);
+      if (!profile?.data || select.dataset.ownerId !== profile.id) throw Error("캐릭터가 바뀌었어. 펫을 다시 선택해 줘.");
+      const name = select.value, chosen = name ? ownedPets(profile).find(pet => pet.name === name) : null;
+      if (name && !chosen) throw Error("이 캐릭터가 보유한 펫만 선택할 수 있어.");
+      if ((profile.data.petName || "") === name) return;
+      const data = profile.data;
+      data.petName = chosen?.name || "";
+      data.petGrade = chosen ? chosen.rarity || chosen.grade || "" : "";
+      data.petType = chosen ? chosen.type || (/^HP-[1-5]$/.test(chosen.hiddenPetCode || "") ? "고유 능력형" : "") : "";
+      data.petEffect = chosen?.effect || "";
+      profile.updatedAt = new Date().toISOString();
+      write(PROFILE_KEY, store);
+      saved = true;
+      doc.movementPetSwitchSaving = true;
+      doc.movementPetSignature = "";
+      loadProfile(doc, true);
+      window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
+      if (typeof CustomEvent === "function") window.dispatchEvent(new CustomEvent("our-rpg:profiles-updated", { detail: { characterId: profile.id, source: "movement-pet-switch" } }));
+      petSwitchMessage(doc, name ? "✓ " + name + " 동행 설정 · 현황표 저장 완료 · 다음 이동부터 적용돼." : "✓ 동행 해제 · 현황표에도 저장했어.");
+    } catch (error) {
+      petSwitchMessage(doc, saved ? "펫은 저장됐어. 이동 결과판을 다시 열어 확인해 줘." : (error.message || "펫 변경을 저장하지 못했어. 다시 시도해 줘."), true);
+      if (!saved) { doc.movementPetSignature = ""; loadProfile(doc, true); }
+    } finally { doc.movementPetSwitchSaving = false; }
+  }
+
   function loadPet(doc, profile) {
     const data = profile?.data || {};
     const name = String(data.petName || "").trim();
@@ -61,6 +130,7 @@
     const signature = JSON.stringify([profile?.id || "", name, effect, data.petGrade || "", data.petType || "", data.petsOwned || []]);
     if (doc.movementPetSignature === signature) return;
     doc.movementPetSignature = signature;
+    renderPetChoices(doc, profile);
     const active = doc.getElementById("petActive");
     const fields = doc.getElementById("petFields");
     const petName = doc.getElementById("petName");
@@ -148,6 +218,9 @@
     if (!judge || judge.dataset.statusBridge === "1") return;
     judge.dataset.statusBridge = "1";
     loadProfile(doc);
+    const petSelect = doc.getElementById("movementPetSelect"), petChange = doc.getElementById("movementPetChange");
+    if (petSelect) petSelect.addEventListener("change", () => petSwitchButton(doc, activeProfile(read(PROFILE_KEY, null))));
+    if (petChange) petChange.addEventListener("click", () => switchMovementPet(doc));
     judge.addEventListener("click", function (event) {
       const profile = loadProfile(doc, true);
       if (!profile) {
@@ -159,10 +232,10 @@
       setTimeout(function () { saveMovement(doc, previousId, profile.id); }, 0);
     }, true);
     window.addEventListener("storage", function (event) {
-      if (event.key === PROFILE_KEY && doc.defaultView && !doc.defaultView.closed) loadProfile(doc);
+      if (event.key === PROFILE_KEY && doc.defaultView && !doc.defaultView.closed) loadProfile(doc, !!doc.movementPetSwitchSaving);
     });
     window.addEventListener("our-rpg:profiles-updated", function () {
-      if (doc.defaultView && !doc.defaultView.closed) loadProfile(doc);
+      if (doc.defaultView && !doc.defaultView.closed) loadProfile(doc, !!doc.movementPetSwitchSaving);
     });
   }
 
