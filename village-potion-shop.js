@@ -84,7 +84,8 @@
   }
 
   function townIndex(region) {
-    const index = TOWNS.findIndex(town => town.region === region);
+    const name = String(region || "").trim();
+    const index = TOWNS.findIndex((town, i) => town.region === name || town.region.split(" · ")[0] === name || ({plain:0,continent:1,boundary:2,border:2}[name] === i));
     return index < 0 ? 0 : index;
   }
 
@@ -138,7 +139,7 @@
     if (!section) return;
     const select = regionSelect(doc);
     const profile = activeProfile();
-    const index = townIndex(select ? select.value : profile?.data?.region);
+    const index = townIndex(profile?.data?.region || select?.value);
     const current = TOWNS[index];
     let panel = doc.getElementById("rpgInventory");
     if (!panel) {
@@ -152,9 +153,9 @@
     addStyle(doc);
 
     const stock = profile ? stockFor(profile) : null;
-    const groups = TOWNS.slice(0, index + 1).reverse().map((town, groupIndex) => `
+    const groups = [current].map(town => `
       <section class="vs-group">
-        <h5>${town.town} · 물약상 ${town.npc}<span>${groupIndex ? "이전 지역 주문" : "현재 마을 판매"}</span></h5>
+        <h5>${town.town} · 물약상 ${town.npc}<span>현재 마을 판매</span></h5>
         <div class="vs-shop">${town.items.map(item => `
           <article class="vs-item">
             <i>${item[1]}</i><div><b>${item[2]}</b><small>${item[4]}</small><strong>${item[5]}</strong><small class="vs-stock">오늘 남은 수량 ${Math.max(0, item[6] - Number(stock?.entry?.bought?.[item[0]] || 0))}/${item[6]}</small></div>
@@ -164,7 +165,7 @@
 
     panel.innerHTML = `
       <div class="vs-head"><div><b>🧪 ${current.town} 물약 상점</b><small>${current.note} · 구매 즉시 돈 차감·인벤토리 저장</small></div><span class="vs-badge">물약상 ${current.npc}</span></div>
-      <div class="vs-rule"><strong>현재 지역: ${current.region}</strong><br>각 마을의 고급 물약은 해당 지역에 도착해야 열려. 상위 마을에서는 이전 지역 물약도 주문할 수 있어.</div>
+      <div class="vs-rule"><strong>현재 지역: ${current.region}</strong><br>현황표의 현재 지역에 맞는 상점으로 자동 전환돼. 현재 지역의 상품만 구매할 수 있어.</div>
       <div class="vs-summary"><div><small>현재 캐릭터</small><b>${profile?.data?.characterName || "저장 필요"}</b></div><div><small>보유 금액</small><b id="vsFunds">${window.OurRpgWallet?.format(moneyTotal(profile)) || moneyTotal(profile) + "구리"}</b></div></div>
       ${groups}<h4>내 소모품</h4><div class="vs-owned" id="villageOwned"></div><h4>최근 구매·사용</h4><ol class="vs-history" id="villageHistory"></ol><p class="vs-msg" id="invMsg" role="status" aria-live="polite"></p>`;
 
@@ -195,6 +196,12 @@
       const active = activeProfile();
       if (!active) return message("먼저 캐릭터 현황표를 저장해 줘.", true);
       if (buy) {
+        if (active.id !== profile?.id || townIndex(active.data?.region) !== index || !current.items.some(item => item[0] === buy.dataset.vsBuy)) {
+          render(doc);
+          const box = doc.getElementById("rpgInventory")?.querySelector("#invMsg");
+          if (box) box.textContent = "캐릭터 또는 지역이 바뀌어 현재 상점으로 갱신했어. 상품을 다시 선택해 줘.";
+          return;
+        }
         const item = ALL_ITEMS[buy.dataset.vsBuy];
         const quantity = Number(buy.parentElement.querySelector("select").value);
         const stockData = stockFor(active);
@@ -251,7 +258,7 @@
         const select = regionSelect(doc);
         const profile = activeProfile();
         const bag = profile ? inventory(profile).bag : null;
-        const signature = JSON.stringify([profile?.id || "", select?.value || profile?.data?.region || "", bag?.items || {}, (bag?.logs || []).slice(0, 5)]);
+        const signature = JSON.stringify([profile?.id || "", profile?.data?.region || select?.value || "", bag?.items || {}, (bag?.logs || []).slice(0, 5)]);
         const panel = doc.getElementById("rpgInventory");
         if (signature !== lastSignature || !panel || panel.dataset.villageShop !== "1") {
           lastSignature = signature;
