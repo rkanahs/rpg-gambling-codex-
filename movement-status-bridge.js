@@ -161,6 +161,10 @@
     const store = read(PROFILE_KEY, null);
     const profile = activeProfile(store);
     loadPet(doc, profile);
+    const speed = Number(profile?.data?.speed);
+    doc.movementSpeed = Number.isFinite(speed) && speed >= 0 ? speed : 0;
+    const speedNotice = doc.getElementById("movementSpeedNotice");
+    if (speedNotice) speedNotice.textContent = "현황표 이속 " + doc.movementSpeed.toLocaleString("ko-KR") + (doc.movementSpeed > 500 ? " · 기본 이동 D100 2회 · 입력한 1회 + 자동 추가 1회 합산 (펫 추가 이동은 별도)" : " · 기본 이동 D100 1회 · 이속 500 초과 시 2회");
     if (!profile || !profile.data) {
       notice(doc, "현황표에 저장된 캐릭터가 없어. 먼저 플레이어 현황표에서 캐릭터를 저장해 줘.", false);
       return null;
