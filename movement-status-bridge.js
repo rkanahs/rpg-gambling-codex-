@@ -154,7 +154,7 @@
     doc.movementPet = { name, effect, extras, rate: match ? 100 + Number(match[1]) : 100 };
     const summary = doc.getElementById('petMovementSummary');
     doc.defaultView?.renderOdds?.();
-    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? ((globalThis.RpgPetMovement?.rules[name]||globalThis.RpgPetMovement?.encounterRows?.([['일반 몬스터',30],['아무 일 없음',70]],true).ability)?' · 고유 능력 자동 판정':' · 수치 없는 고유 효과는 운영자 판정 필요') : '');
+    if (summary) summary.textContent = !name ? '동행 펫 없음 · 추가 이동 없음' : name + ' · 추가 이동 D100 ' + extras + '회 · 이동 보정 ' + (match ? 100 + Number(match[1]) : 100) + '%' + (/발견|확률|판정|랜덤|보조/.test(effect) ? ((globalThis.RpgPetMovement?.rules[name]||globalThis.RpgPetMovement?.encounterRows?.([['일반 몬스터',30],['희귀 몬스터',12],['아무 일 없음',58]],true).ability)?' · 고유 능력 자동 판정':' · 수치 없는 고유 효과는 운영자 판정 필요') : '');
   }
 
   function loadProfile(doc, preserveRegion = false) {
