@@ -180,8 +180,69 @@
       region.dispatchEvent(new Event("change", { bubbles: true }));
     }
     doc.movementProfileId = profile.id;
-    notice(doc, (data.characterName || data.playerName || "현재 캐릭터") + "의 현황을 불러왔어. 이동 판정이 끝나면 누적 거리와 지역이 자동 저장돼.", true);
+    const villages = data.subVillageExploration?.discovered;
+    const known = Array.isArray(villages) && villages.length ? " · 발견한 서브 마을: " + villages.map(v => v.name).join(", ") : " · 이동 후 도착 구간의 서브 마을을 별도로 판정해.";
+    notice(doc, (data.characterName || data.playerName || "현재 캐릭터") + "의 현황을 불러왔어. 이동 판정이 끝나면 누적 거리와 지역이 자동 저장돼." + known, true);
     return profile;
+  }
+
+  // Public sub-villages are a separate discovery roll; they never replace encounters.
+  const SUB_VILLAGES = [
+    ["이슬고개", "평원", 700, 1400], ["바람씨앗 마을", "평원", 3100, 3900],
+    ["은뿌리 마을", "대륙", 6300, 7300], ["달그늘 나루", "대륙", 11100, 12100],
+    ["잿빛초소", "경계", 16000, 17500], ["별잠 마을", "경계", 21000, Infinity]
+  ];
+
+  function discoverVillage(store, profile, move, roll = () => Math.floor(Math.random() * 100) + 1) {
+    if (move.subVillage) return move.subVillage;
+    const coordinate = Number(move.currentCoordinate);
+    if (!Number.isSafeInteger(coordinate) || coordinate < 0) return null;
+    const candidate = SUB_VILLAGES.find(v => coordinate >= v[2] && coordinate <= v[3]);
+    const data = profile.data;
+    const state = data.subVillageExploration || { moves: 0, failures: 0, lastMoveId: "", lastFoundAt: "", foundAtMove: 0, discovered: [] };
+    if (state.lastMoveId === move.id) return null;
+    state.moves = number(state.moves) + 1;
+    state.lastMoveId = move.id;
+    data.subVillageExploration = state;
+    // The rediscovery cooldown belongs to the player, including their other characters.
+    const recent = store.profiles.map(p => p.data?.subVillageExploration).filter(s => s?.lastFoundAt)
+      .sort((a, b) => Date.parse(b.lastFoundAt) - Date.parse(a.lastFoundAt))[0];
+    const at = Date.parse(move.at);
+    const recentAt = Date.parse(recent?.lastFoundAt);
+    const movesSinceFound = store.profiles.reduce((n, p) => {
+      const s = p.data?.subVillageExploration;
+      return n + (s && s.cooldownSince === recent?.lastFoundAt ? number(s.cooldownMoves) : 0);
+    }, 0);
+    if (recent) {
+      if (state.cooldownSince !== recent.lastFoundAt) { state.cooldownSince = recent.lastFoundAt; state.cooldownMoves = 0; }
+      state.cooldownMoves = number(state.cooldownMoves) + 1;
+    }
+    if (!candidate) return null;
+    if (recent && (!Number.isFinite(at) || at - recentAt < 86400000 || movesSinceFound + 1 < 3)) return null;
+    const raw = roll();
+    const luck = Math.min(5, Math.floor(number(data.luck) / 10));
+    const pity = Math.min(3, Math.floor(number(state.failures) / 8));
+    const threshold = { "평원": 93, "대륙": 94, "경계": 95 }[candidate[1]];
+    const success = raw + luck + pity >= threshold;
+    const result = { movementId: move.id, at: move.at, name: success ? candidate[0] : "", success, raw, luck, pity };
+    move.subVillage = result;
+    if (!success) { state.failures = number(state.failures) + 1; return result; }
+    state.failures = 0;
+    state.lastFoundAt = move.at;
+    state.foundAtMove = state.moves;
+    state.cooldownSince = move.at;
+    state.cooldownMoves = 0;
+    const found = Array.isArray(state.discovered) ? state.discovered : [];
+    if (!found.some(v => v.name === candidate[0])) found.push({ name: candidate[0], region: candidate[1], at: move.at, movementId: move.id });
+    state.discovered = found;
+    return result;
+  }
+
+  function showVillageResult(doc, move) {
+    const result = doc.getElementById("result");
+    const village = move.subVillage;
+    if (!result || !village?.success || result.textContent.includes("서브 마을 발견 · " + village.name)) return;
+    result.textContent += "\n서브 마을 발견 · " + village.name + "\n마을 의뢰·입장은 운영자 확인 · 히든 지역 발견과 별도";
   }
 
   function saveMovement(doc, previousId, ownerId) {
@@ -210,6 +271,9 @@
     move.character = data.characterName || data.playerName || move.character || "";
     try {
     globalThis.RpgPetMovement?.apply(profile, move);
+    discoverVillage(store, profile, move);
+    if (move.subVillage?.success) data.lastMovement += " · 서브 마을 발견 · " + move.subVillage.name;
+    profile.updatedAt = new Date().toISOString();
     write(PROFILE_KEY, store);
     write(MOVE_KEY, move);
     write(APPLIED_KEY, [...(Array.isArray(applied) ? applied : []), move.id].slice(-100));
@@ -217,6 +281,7 @@
       notice(doc, "이동 현황 저장에 실패했어. 저장 공간을 확인해 줘.", false);
       return;
     }
+    showVillageResult(doc, move);
     const total = doc.getElementById("total");
     if (total) total.value = String(data.distance);
     window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
