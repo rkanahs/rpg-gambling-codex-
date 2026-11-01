@@ -161,6 +161,8 @@
     const store = read(PROFILE_KEY, null);
     const profile = activeProfile(store);
     loadPet(doc, profile);
+    installTower(doc, profile);
+    renderTower(doc, profile);
     const speed = Number(profile?.data?.speed);
     doc.movementSpeed = Number.isFinite(speed) && speed >= 0 ? speed : 0;
     const speedNotice = doc.getElementById("movementSpeedNotice");
@@ -286,6 +288,84 @@
     if (total) total.value = String(data.distance);
     window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
     notice(doc, "✓ " + (move.character || "현재 캐릭터") + " 현황에 기록 완료 · 누적 이동거리 " + data.distance.toLocaleString("ko-KR") + " · " + data.region, true);
+  }
+
+  const TOWER_CLUE_ID = "tower-worn-record-v1";
+  const TOWER_HINT = "망자의 이름을 기억하는 술사가 있었다. 밤의 폐허에 남은 기록을 찾아라. 답을 찾거든 흑마법의 기원을 아는 자에게 물어라.";
+
+  function towerLocations(profile) {
+    const region = formRegion(profile?.data?.region);
+    const main = { plain: "해오름뜰", continent: "큰길마루", boundary: "끝빛보루" }[region];
+    const locations = [main];
+    const distance = Number(profile?.data?.distance);
+    const found = profile?.data?.subVillageExploration?.discovered;
+    if (Array.isArray(found)) for (const village of SUB_VILLAGES) {
+      if (REGION_TO_FORM[village[1]] === region && distance >= village[2] && distance <= village[3] && found.some(v => v.name === village[0])) locations.push(village[0]);
+    }
+    return locations;
+  }
+
+  function towerRecord(profile) {
+    return (Array.isArray(profile?.data?.towerClues) ? profile.data.towerClues : []).find(r => r.id === TOWER_CLUE_ID);
+  }
+
+  function findTowerClue(profile, village, at = new Date().toISOString()) {
+    if (!profile?.id || !profile.data || !towerLocations(profile).includes(village)) throw Error("현재 지역에서 방문 가능한 마을 마탑을 선택해 줘.");
+    const existing = towerRecord(profile);
+    if (existing) return existing;
+    const record = { id: TOWER_CLUE_ID, village, at, hint: TOWER_HINT };
+    profile.data.towerClues = [...(Array.isArray(profile.data.towerClues) ? profile.data.towerClues : []), record];
+    profile.updatedAt = at;
+    return record;
+  }
+
+  function towerText(profile, record) {
+    return "[우리들의 RPG · 마탑 조사 기록]\n캐릭터: " + (profile.data.characterName || profile.data.playerName || "현재 캐릭터") + "\n조사 장소: " + record.village + " 마탑\n발견: ??? · 낡은 기록\n단서: " + record.hint + "\n발견 시각: " + record.at + "\n단서는 운영자에게 보여 줘. 후속 조건·전직·보상은 운영자가 확인해.";
+  }
+
+  function renderTower(doc, profile) {
+    const panel = doc.getElementById("villageTowerPanel");
+    if (!panel) return;
+    const select = doc.getElementById("towerVillage"), button = doc.getElementById("towerInvestigate"), result = doc.getElementById("towerClueResult"), copy = doc.getElementById("towerClueCopy");
+    const locations = profile?.data ? towerLocations(profile) : [];
+    const previous = select.value;
+    select.innerHTML = locations.map(v => '<option value="' + escapePet(v) + '">' + escapePet(v) + ' 마탑</option>').join("");
+    if (locations.includes(previous)) select.value = previous;
+    select.dataset.ownerId = profile?.id || "";
+    select.disabled = !profile;
+    button.disabled = !profile?.data;
+    const record = towerRecord(profile);
+    button.textContent = record ? "발견한 기록 다시 보기" : "마탑 기록 조사";
+    result.textContent = record ? towerText(profile, record) : profile ? "마을 마탑에 남은 낡은 기록을 조사할 수 있어. 발견한 단서는 캐릭터에 저장돼." : "먼저 현황표에서 캐릭터를 저장해 줘.";
+    copy.hidden = !record;
+  }
+
+  function installTower(doc, profile) {
+    if (!doc.getElementById("result") || doc.getElementById("villageTowerPanel")) return;
+    const panel = doc.createElement("section");
+    panel.id = "villageTowerPanel";
+    panel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
+    panel.innerHTML = '<h3>마을 마탑</h3><p>현재 지역의 중심 마을 또는 도착 구간에서 발견한 서브 마을의 마탑을 조사해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
+    doc.getElementById("result").after(panel);
+    doc.getElementById("towerInvestigate").addEventListener("click", () => {
+      const select = doc.getElementById("towerVillage");
+      try {
+        const store = read(PROFILE_KEY, null), current = activeProfile(store);
+        if (!current || current.id !== select.dataset.ownerId) throw Error("캐릭터가 바뀌었어. 마탑을 다시 선택해 줘.");
+        const record = findTowerClue(current, select.value);
+        write(PROFILE_KEY, store);
+        renderTower(doc, current);
+        window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
+        if (typeof CustomEvent === "function") window.dispatchEvent(new CustomEvent("our-rpg:profiles-updated", { detail: { characterId: current.id, source: "tower-investigation" } }));
+      } catch (error) { doc.getElementById("towerClueResult").textContent = "저장하지 못했어 · " + error.message; }
+    });
+    doc.getElementById("towerClueCopy").addEventListener("click", async () => {
+      const current = activeProfile(read(PROFILE_KEY, null)), record = towerRecord(current);
+      if (!record || current.id !== doc.getElementById("towerVillage").dataset.ownerId) return;
+      try { await navigator.clipboard.writeText(towerText(current, record)); doc.getElementById("towerClueCopy").textContent = "복사 완료"; }
+      catch (_) { doc.getElementById("towerClueCopy").textContent = "기록을 길게 눌러 복사해 줘"; }
+    });
+    renderTower(doc, profile);
   }
 
   function bind(doc) {
