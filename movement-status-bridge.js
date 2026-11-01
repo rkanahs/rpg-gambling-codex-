@@ -309,7 +309,20 @@
     return (Array.isArray(profile?.data?.towerClues) ? profile.data.towerClues : []).find(r => r.id === TOWER_CLUE_ID);
   }
 
+  function canInvestigateTower(profile) {
+    const data = profile?.data;
+    if (!data) return false;
+    try {
+      const jobs = globalThis.RpgSkillLearning?.allowedJobs?.(data);
+      if (jobs) return jobs.has("마법사");
+    } catch (_) { return false; }
+    const mageJobs = new Set(["법사", "마법사", "대마도사", "대원소술사", "마도 현자", "마도대현자", "비전술사", "빙결대현자", "빙결술사", "빙결의 현자", "서리 마도사", "아크메이지", "영원의 서리", "원소술사", "원소의 지배자", "정령 마도사", "정령왕의 계약자", "폭염 마도사", "폭염의 지배자", "화염대현자", "화염술사", "화염의 현자"]);
+    const base = String(data.job || "").replace(/\([^)]*\)/g, "").split(/[→>,/|·\n]+/)[0].trim();
+    return mageJobs.has(base);
+  }
+
   function findTowerClue(profile, village, at = new Date().toISOString()) {
+    if (!canInvestigateTower(profile)) throw Error("마법사 계열 직업만 마탑을 조사할 수 있어.");
     if (!profile?.id || !profile.data || !towerLocations(profile).includes(village)) throw Error("현재 지역에서 방문 가능한 마을 마탑을 선택해 줘.");
     const existing = towerRecord(profile);
     if (existing) return existing;
@@ -332,12 +345,13 @@
     select.innerHTML = locations.map(v => '<option value="' + escapePet(v) + '">' + escapePet(v) + ' 마탑</option>').join("");
     if (locations.includes(previous)) select.value = previous;
     select.dataset.ownerId = profile?.id || "";
-    select.disabled = !profile;
-    button.disabled = !profile?.data;
+    const eligible = canInvestigateTower(profile);
+    select.disabled = !eligible;
+    button.disabled = !eligible;
     const record = towerRecord(profile);
-    button.textContent = record ? "발견한 기록 다시 보기" : "마탑 기록 조사";
-    result.textContent = record ? towerText(profile, record) : profile ? "마을 마탑에 남은 낡은 기록을 조사할 수 있어. 발견한 단서는 캐릭터에 저장돼." : "먼저 현황표에서 캐릭터를 저장해 줘.";
-    copy.hidden = !record;
+    button.textContent = profile && !eligible ? "마법사 계열만 조사 가능" : record ? "발견한 기록 다시 보기" : "마탑 기록 조사";
+    result.textContent = profile && !eligible ? "마법사 계열 직업만 마탑을 조사할 수 있어." : record ? towerText(profile, record) : profile ? "마을 마탑에 남은 낡은 기록을 조사할 수 있어. 발견한 단서는 캐릭터에 저장돼." : "먼저 현황표에서 캐릭터를 저장해 줘.";
+    copy.hidden = !record || !eligible;
   }
 
   function installTower(doc, profile) {
@@ -345,7 +359,7 @@
     const panel = doc.createElement("section");
     panel.id = "villageTowerPanel";
     panel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
-    panel.innerHTML = '<h3>마을 마탑</h3><p>현재 지역의 중심 마을 또는 도착 구간에서 발견한 서브 마을의 마탑을 조사해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
+    panel.innerHTML = '<h3>마을 마탑</h3><p>마법사 계열만 조사할 수 있어. 현재 지역의 중심 마을 또는 도착 구간에서 발견한 서브 마을의 마탑을 선택해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
     doc.getElementById("result").after(panel);
     doc.getElementById("towerInvestigate").addEventListener("click", () => {
       const select = doc.getElementById("towerVillage");
@@ -361,7 +375,7 @@
     });
     doc.getElementById("towerClueCopy").addEventListener("click", async () => {
       const current = activeProfile(read(PROFILE_KEY, null)), record = towerRecord(current);
-      if (!record || current.id !== doc.getElementById("towerVillage").dataset.ownerId) return;
+      if (!record || !canInvestigateTower(current) || current.id !== doc.getElementById("towerVillage").dataset.ownerId) return;
       try { await navigator.clipboard.writeText(towerText(current, record)); doc.getElementById("towerClueCopy").textContent = "복사 완료"; }
       catch (_) { doc.getElementById("towerClueCopy").textContent = "기록을 길게 눌러 복사해 줘"; }
     });
