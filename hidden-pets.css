@@ -6,3 +6,9 @@
 .hidden-pet-slot-8{background-position:100% 0%!important}
 .hidden-pet-slot-9{background-position:0% 100%!important}
 .hidden-pet-slot-10{background-position:50% 100%!important}
+
+/* Additional celestial guardian companions HP-11..13. */
+.hidden-pet-slot-11,.hidden-pet-slot-12,.hidden-pet-slot-13{background-image:url('pet-art/pets-hidden-guardians.webp?v=20261102');background-size:300% 100%;background-repeat:no-repeat}
+.hidden-pet-slot-11{background-position:0% 0%!important}
+.hidden-pet-slot-12{background-position:50% 0%!important}
+.hidden-pet-slot-13{background-position:100% 0%!important}
