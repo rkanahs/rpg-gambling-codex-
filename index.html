@@ -313,7 +313,7 @@ function decodeRawPage(value){
 }
 function decodePage(value){
   const html=decodeRawPage(value);
-  const bridge='<scr'+'ipt>(function(){document.addEventListener("click",function(event){var link=event.target.closest("a[href]");if(!link)return;var match=link.getAttribute("href").match(/^\.\.\/([^/]+)\/?/);if(match){event.preventDefault();parent.postMessage({type:"open-rpg-codex",slug:match[1]},"*")}});document.addEventListener("keydown",function(event){if(event.key==="Escape")parent.postMessage({type:"close-rpg-codex"},"*")},true);})();</scr'+'ipt>';
+  const bridge='<scr'+'ipt>(function(){document.addEventListener("click",function(event){var target=event.target;var link=target&&target.closest?target.closest("a[href]"):null;if(!link)return;var href=link.getAttribute("href")||"";if(href.indexOf("../")!==0)return;var slug=href.slice(3).split("/")[0];if(!slug)return;event.preventDefault();parent.postMessage({type:"open-rpg-codex",slug:slug},"*")});document.addEventListener("keydown",function(event){if(event.key==="Escape")parent.postMessage({type:"close-rpg-codex"},"*")},true);})();</scr'+'ipt>';
   return html.replace(/<\/body>/i,bridge+'</body>');
 }
 function portalUrl(){const url=new URL(location.href);url.hash='';return url.href}
