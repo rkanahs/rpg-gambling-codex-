@@ -97,7 +97,10 @@
     const all = read(STOCK_KEY, {});
     const key = profile.id || profile.data.characterName;
     const day = koreaDay();
-    if (!all[key] || all[key].day !== day) all[key] = { day, bought: {} };
+    if (!all[key] || all[key].day !== day) {
+      all[key] = { day, bought: {} };
+      localStorage.setItem(STOCK_KEY, JSON.stringify(all));
+    }
     return { all, entry: all[key] };
   }
 
@@ -165,7 +168,7 @@
 
     panel.innerHTML = `
       <div class="vs-head"><div><b>🧪 ${current.town} 물약 상점</b><small>${current.note} · 구매 즉시 돈 차감·인벤토리 저장</small></div><span class="vs-badge">물약상 ${current.npc}</span></div>
-      <div class="vs-rule"><strong>현재 지역: ${current.region}</strong><br>현황표의 현재 지역에 맞는 상점으로 자동 전환돼. 현재 지역의 상품만 구매할 수 있어.</div>
+      <div class="vs-rule"><strong>현재 지역: ${current.region}</strong><br>현황표의 현재 지역에 맞는 상점으로 자동 전환돼. 현재 지역의 상품만 구매할 수 있어. 한국 시간 매일 00:00에 상품별 재고가 99개로 다시 채워져.</div>
       <div class="vs-summary"><div><small>현재 캐릭터</small><b>${profile?.data?.characterName || "저장 필요"}</b></div><div><small>보유 금액</small><b id="vsFunds">${window.OurRpgWallet?.format(moneyTotal(profile)) || moneyTotal(profile) + "구리"}</b></div></div>
       ${groups}<h4>내 소모품</h4><div class="vs-owned" id="villageOwned"></div><h4>최근 구매·사용</h4><ol class="vs-history" id="villageHistory"></ol><p class="vs-msg" id="invMsg" role="status" aria-live="polite"></p>`;
 
@@ -258,7 +261,8 @@
         const select = regionSelect(doc);
         const profile = activeProfile();
         const bag = profile ? inventory(profile).bag : null;
-        const signature = JSON.stringify([profile?.id || "", profile?.data?.region || select?.value || "", bag?.items || {}, (bag?.logs || []).slice(0, 5)]);
+        const stock = profile ? stockFor(profile).entry : null;
+        const signature = JSON.stringify([koreaDay(), stock?.bought || {}, profile?.id || "", profile?.data?.region || select?.value || "", bag?.items || {}, (bag?.logs || []).slice(0, 5)]);
         const panel = doc.getElementById("rpgInventory");
         if (signature !== lastSignature || !panel || panel.dataset.villageShop !== "1") {
           lastSignature = signature;
@@ -269,6 +273,8 @@
     frame.addEventListener("load", () => setTimeout(run, 80));
     window.addEventListener("our-rpg:profiles-updated", run);
     window.addEventListener("storage", run);
+    window.addEventListener("focus", run);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) run(); });
     setInterval(run, 700);
     setTimeout(run, 80);
   }
