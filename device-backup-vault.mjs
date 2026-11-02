@@ -1,0 +1,7 @@
+// Backups live outside localStorage when its small per-origin limit is reached.
+export class DeviceBackupVault{
+ constructor(factory=globalThis.indexedDB){this.factory=factory}
+ open(){return new Promise((resolve,reject)=>{if(!this.factory){reject(Error('기기 백업 저장소를 사용할 수 없어.'));return}let done=false;const request=this.factory.open('our-rpg-device-backups-v1',1),timer=setTimeout(()=>{done=true;reject(Error('기기 백업 저장소 연결이 지연됐어.'));},5000);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('backups'))request.result.createObjectStore('backups')};request.onsuccess=()=>{if(done){request.result.close();return}done=true;clearTimeout(timer);resolve(request.result)};request.onerror=()=>{if(done)return;done=true;clearTimeout(timer);reject(request.error||Error('기기 백업 저장소 연결 실패'))}})}
+ async load(){const db=await this.open();return new Promise((resolve,reject)=>{const tx=db.transaction('backups','readonly'),r=tx.objectStore('backups').get('recent');let result=[];r.onsuccess=()=>{result=Array.isArray(r.result)?r.result:[]};tx.oncomplete=()=>{db.close();resolve(result)};tx.onabort=tx.onerror=()=>{db.close();reject(tx.error||Error('기기 백업 읽기 실패'))}})}
+ async save(list){const db=await this.open();return new Promise((resolve,reject)=>{const tx=db.transaction('backups','readwrite');tx.objectStore('backups').put(list.slice(0,3),'recent');tx.oncomplete=()=>{db.close();resolve()};tx.onabort=tx.onerror=()=>{db.close();reject(tx.error||Error('기기 백업 저장 실패'))}})}
+}
