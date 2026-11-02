@@ -472,6 +472,7 @@
       return;
     }
     showVillageResult(doc, move);
+    renderResultCodexLinks(doc, move);
     if (activeProfile(store)?.id === profile.id) renderTower(doc, profile);
     const total = doc.getElementById("total");
     if (total) total.value = String(data.distance);
@@ -583,8 +584,18 @@
     if (!result || doc.getElementById("movementResultCodexLinks")) return;
     const links = doc.createElement("nav");
     links.id = "movementResultCodexLinks";
-    links.setAttribute("aria-label", "판정 결과 도감 바로가기");
-    links.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:12px 0";
+    links.setAttribute("aria-label", "이번 이동 결과 도감 바로가기");
+    links.hidden = true;
+    result.after(links);
+  }
+
+  function renderResultCodexLinks(doc, move) {
+    const links = doc.getElementById("movementResultCodexLinks");
+    if (!links) return;
+    links.replaceChildren();
+    links.hidden = true;
+    links.style.cssText = "";
+    if (!move) return;
     const add = (label, action) => {
       const button = doc.createElement("button");
       button.type = "button";
@@ -593,12 +604,16 @@
       button.addEventListener("click", action);
       links.append(button);
     };
-    add("도감으로 가기", () => document.getElementById("viewerBack")?.click());
-    add("서브마을 퀘스트 보기", () => doc.getElementById("subVillagePanel")?.scrollIntoView({behavior:"smooth", block:"start"}));
-    for (const [label, slug] of [["몬스터 전투", "our-rpg-monster-battle"], ["상자 도감", "our-rpg-treasure-codex"]]) {
-      add(label, () => document.querySelector('a[href="' + slug + '/"]')?.click());
+    const encounter = String(move.encounter || "");
+    const route = (label, slug) => add(label, () => document.querySelector('a[href="' + slug + '/"]')?.click());
+    if (/몬스터|보스/.test(encounter)) route("몬스터 전투 도감", "our-rpg-monster-battle");
+    else if (/상자/.test(encounter)) route("상자 도감", "our-rpg-treasure-codex");
+    else if (/탈것/.test(encounter)) route("탈것 도감", "our-rpg-mounts-open");
+    if (move.subVillage?.success) add(move.subVillage.name + " · 퀘스트 보기", () => doc.getElementById("subVillagePanel")?.scrollIntoView({behavior:"smooth", block:"start"}));
+    if (links.childElementCount) {
+      links.hidden = false;
+      links.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:12px 0";
     }
-    result.after(links);
   }
 
   function bind(doc) {
