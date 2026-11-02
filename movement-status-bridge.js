@@ -372,13 +372,21 @@
   }
 ];
 
+  function currentVillage(profile) {
+    const state = profile?.data?.subVillageExploration;
+    if (!state) return null;
+    const visit = Object.prototype.hasOwnProperty.call(state, 'currentVisit') ? state.currentVisit : (Array.isArray(state.discovered) ? state.discovered.at(-1) : null);
+    return visit && SUB_VILLAGES.some(v => v[0] === visit.name) ? visit : null;
+  }
+
   function renderVillageQuests(doc, profile) {
     const list = doc.getElementById("subVillageQuestList");
     if (!list) return;
     const found = profile?.data?.subVillageExploration?.discovered;
-    const known = new Set((Array.isArray(found) ? found : []).map(v => v?.name));
+    const visit = currentVillage(profile);
+    const known = new Set(visit ? [visit.name] : []);
     const offers = SUB_VILLAGE_QUESTS.filter(q => known.has(q.village));
-    if (!offers.length) { list.innerHTML = '<p>서브마을을 발견하면 그 마을의 기존 퀘스트가 여기에 표시돼.</p>'; return; }
+    if (!offers.length) { list.innerHTML = '<p>현재 머무는 서브마을이 없어. 이동에서 서브마을을 발견하면 그 마을의 퀘스트가 표시돼.</p>'; return; }
     const groups = [...new Set(offers.map(q => q.village))];
     list.innerHTML = '<h4>발견한 마을 퀘스트</h4><p>퀘스트를 받으면 현재 캐릭터에 저장돼. 진행 조건과 다음 단계, 완료·보상은 운영자가 확인해.</p>' + groups.map(village => '<section style="margin-top:14px"><h4>' + escapePet(village) + ' · ' + offers.filter(q => q.village === village).length + '개 의뢰</h4>' + offers.filter(q => q.village === village).map((q,i) => '<details data-village-quest="' + escapePet(q.id) + '"' + (i===0?' open':'') + ' style="margin:9px 0;padding:12px;border:1px solid #655936;border-radius:8px"><summary style="cursor:pointer;font-weight:800">' + escapePet(q.title) + ' · ' + escapePet(q.grade) + '</summary><p><b>발견 단서</b> · ' + escapePet(q.clue) + '</p><p>' + escapePet(q.arrival) + '</p><p><b>첫 목표</b> · ' + escapePet(q.objective) + '</p><p><b>공개 보상</b> · ' + q.rewards.map(escapePet).join(' · ') + '</p><p><button type="button" data-accept-village-quest="' + escapePet(q.id) + '"' + (profile?.data?.villageQuests?.[q.id] ? ' disabled' : '') + ' style="min-height:44px;padding:10px 14px;cursor:pointer">' + (profile?.data?.villageQuests?.[q.id] ? '받은 퀘스트 · 진행 조건 확인 필요' : '퀘스트 받기') + '</button></p><small>추가 선행 조건과 다음 단계는 운영자에게 확인해.</small></details>').join('') + '</section>').join('');
     list.querySelectorAll?.('[data-accept-village-quest]').forEach(button => button.addEventListener('click', () => {
@@ -387,7 +395,7 @@
       if (!current || current.id !== profile.id) { renderVillageQuests(doc, current); return; }
       const quest = SUB_VILLAGE_QUESTS.find(q => q.id === button.dataset.acceptVillageQuest);
       const found = current.data?.subVillageExploration?.discovered;
-      if (!quest || !Array.isArray(found) || !found.some(v => v?.name === quest.village)) return;
+      if (!quest || !Array.isArray(found) || !found.some(v => v?.name === quest.village) || currentVillage(current)?.name !== quest.village) return;
       const records = current.data.villageQuests || {};
       if (records[quest.id]) { renderVillageQuests(doc, current); return; }
       const previous = current.updatedAt;
@@ -411,6 +419,7 @@
     if (state.lastMoveId === move.id) return null;
     state.moves = number(state.moves) + 1;
     state.lastMoveId = move.id;
+    state.currentVisit = null;
     data.subVillageExploration = state;
     // The rediscovery cooldown belongs to the player, including their other characters.
     const recent = store.profiles.map(p => p.data?.subVillageExploration).filter(s => s?.lastFoundAt)
@@ -435,6 +444,7 @@
     const result = { movementId: move.id, at: move.at, name: success ? candidate[0] : "", success, raw, luck, pity };
     move.subVillage = result;
     if (!success) { state.failures = number(state.failures) + 1; return result; }
+    state.currentVisit = {name: candidate[0], movementId: move.id, at: move.at};
     state.failures = 0;
     state.lastFoundAt = move.at;
     state.foundAtMove = state.moves;
@@ -480,6 +490,7 @@
     try {
     globalThis.RpgPetMovement?.apply(profile, move);
     discoverVillage(store, profile, move);
+    if (data.subVillageExploration) data.subVillageExploration.currentVisit = move.subVillage?.success ? {name: move.subVillage.name, movementId: move.id, at: move.at} : null;
     if (move.subVillage?.success) data.lastMovement += " · 서브 마을 발견 · " + move.subVillage.name;
     profile.updatedAt = new Date().toISOString();
     write(PROFILE_KEY, store);
@@ -548,11 +559,9 @@
     const panel = doc.getElementById("villageTowerPanel");
     if (!panel) return;
     const select = doc.getElementById("towerVillage"), button = doc.getElementById("towerInvestigate"), result = doc.getElementById("towerClueResult"), copy = doc.getElementById("towerClueCopy");
-    const found = profile?.data?.subVillageExploration?.discovered;
-    const known = Array.isArray(found) ? SUB_VILLAGES.filter(v => found.some(x => x?.name === v[0])).map(v => v[0]) : [];
-    const nearby = profile?.data ? towerLocations(profile).slice(1) : [];
+    const visit = currentVillage(profile);
     const villageStatus = doc.getElementById("subVillageStatus");
-    if (villageStatus) villageStatus.textContent = known.length ? "발견한 서브마을 · " + known.join(", ") + "\n" + (nearby.length ? "현재 구간의 서브마을 · " + nearby.join(", ") : "현재 이동 구간 밖에 있어도 발견 기록은 유지돼.") : profile?.data ? "아직 발견한 서브마을이 없어. 이동 판정에서 발견하면 여기에 계속 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
+    if (villageStatus) villageStatus.textContent = visit ? "발견한 서브마을 · " + visit.name + "\n다음 이동을 하면 이 마을에서 떠나." : profile?.data ? "현재 머무는 서브마을이 없어. 새 서브마을을 발견하면 여기에 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
     renderVillageQuests(doc, profile);
     select.value = "마탑";
     select.dataset.ownerId = profile?.id || "";
@@ -569,7 +578,7 @@
     const villagePanel = doc.createElement("section");
     villagePanel.id = "subVillagePanel";
     villagePanel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
-    villagePanel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>발견 기록은 캐릭터별로 저장돼. 이동을 다시 판정하거나 다른 구간으로 이동해도 사라지지 않아.</p><div id="subVillageQuestList"></div>';
+    villagePanel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>서브마을은 다음 이동을 하면 화면에서 사라져. 새 마을을 발견하면 여기에서 확인해. 이미 받은 퀘스트는 퀘스트 진행판에 남아.</p><div id="subVillageQuestList"></div>';
     const panel = doc.createElement("section");
     panel.id = "villageTowerPanel";
     panel.style.cssText = villagePanel.style.cssText;
