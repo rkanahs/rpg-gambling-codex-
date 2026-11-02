@@ -286,7 +286,7 @@
       return;
     }
     showVillageResult(doc, move);
-    if (activeProfile(store)?.id === profile.id) renderTower(doc, profile, move.subVillage?.success ? move.subVillage.name : "");
+    if (activeProfile(store)?.id === profile.id) renderTower(doc, profile);
     const total = doc.getElementById("total");
     if (total) total.value = String(data.distance);
     window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
@@ -326,7 +326,7 @@
 
   function findTowerClue(profile, village, at = new Date().toISOString()) {
     if (!canInvestigateTower(profile)) throw Error("마법사 계열 직업만 마탑을 조사할 수 있어.");
-    if (!profile?.id || !profile.data || !towerLocations(profile).includes(village)) throw Error("현재 지역에서 방문 가능한 마을 마탑을 선택해 줘.");
+    if (!profile?.id || !profile.data || (village !== "마탑" && !towerLocations(profile).includes(village))) throw Error("조사할 마탑을 확인해 줘.");
     const existing = towerRecord(profile);
     if (existing) return existing;
     const record = { id: TOWER_CLUE_ID, village, at, hint: TOWER_HINT };
@@ -336,40 +336,40 @@
   }
 
   function towerText(profile, record) {
-    return "[우리들의 RPG · 마탑 조사 기록]\n캐릭터: " + (profile.data.characterName || profile.data.playerName || "현재 캐릭터") + "\n조사 장소: " + record.village + " 마탑\n발견: ??? · 낡은 기록\n단서: " + record.hint + "\n발견 시각: " + record.at + "\n단서는 운영자에게 보여 줘. 후속 조건·전직·보상은 운영자가 확인해.";
+    return "[우리들의 RPG · 마탑 조사 기록]\n캐릭터: " + (profile.data.characterName || profile.data.playerName || "현재 캐릭터") + "\n조사 장소: 마탑\n발견: ??? · 낡은 기록\n단서: " + record.hint + "\n발견 시각: " + record.at + "\n단서는 운영자에게 보여 줘. 후속 조건·전직·보상은 운영자가 확인해.";
   }
 
-  function renderTower(doc, profile, discoveredVillage = "") {
+  function renderTower(doc, profile) {
     const panel = doc.getElementById("villageTowerPanel");
     if (!panel) return;
     const select = doc.getElementById("towerVillage"), button = doc.getElementById("towerInvestigate"), result = doc.getElementById("towerClueResult"), copy = doc.getElementById("towerClueCopy");
-    const locations = profile?.data ? towerLocations(profile) : [];
-    const previous = select.dataset.ownerId === profile?.id ? select.value : "";
-    const nearby = locations.slice(1);
-    const last = read(MOVE_KEY, null);
-    const lastFound = last?.characterId === profile?.id && Number(last.currentCoordinate) === Number(profile?.data?.distance) && last.subVillage?.success ? last.subVillage.name : "";
-    const selectedVillage = nearby.includes(discoveredVillage) ? discoveredVillage : locations.includes(previous) ? previous : nearby.includes(lastFound) ? lastFound : locations[0];
+    const found = profile?.data?.subVillageExploration?.discovered;
+    const known = Array.isArray(found) ? SUB_VILLAGES.filter(v => found.some(x => x?.name === v[0])).map(v => v[0]) : [];
+    const nearby = profile?.data ? towerLocations(profile).slice(1) : [];
     const villageStatus = doc.getElementById("subVillageStatus");
-    if (villageStatus) villageStatus.textContent = nearby.length ? (nearby.includes(lastFound) ? "이번 이동에서 발견한 서브마을 · " + lastFound + "\n" : "") + "현재 방문 가능한 서브마을 · " + nearby.join(", ") : profile?.data ? "현재 구간에서 발견한 서브마을이 없어. 이동 판정에서 발견하면 여기에 자동으로 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
-    select.innerHTML = locations.map(v => '<option value="' + escapePet(v) + '">' + escapePet(v) + ' 마탑</option>').join("");
-    if (selectedVillage) select.value = selectedVillage;
+    if (villageStatus) villageStatus.textContent = known.length ? "발견한 서브마을 · " + known.join(", ") + "\n" + (nearby.length ? "현재 구간의 서브마을 · " + nearby.join(", ") : "현재 이동 구간 밖에 있어도 발견 기록은 유지돼.") : profile?.data ? "아직 발견한 서브마을이 없어. 이동 판정에서 발견하면 여기에 계속 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
+    select.value = "마탑";
     select.dataset.ownerId = profile?.id || "";
     const eligible = canInvestigateTower(profile);
-    select.disabled = !eligible;
     button.disabled = !eligible;
     const record = towerRecord(profile);
     button.textContent = profile && !eligible ? "마법사 계열만 조사 가능" : record ? "발견한 기록 다시 보기" : "마탑 기록 조사";
-    result.textContent = profile && !eligible ? "마법사 계열 직업만 마탑을 조사할 수 있어." : record ? towerText(profile, record) : profile ? "마을 마탑에 남은 낡은 기록을 조사할 수 있어. 발견한 단서는 캐릭터에 저장돼." : "먼저 현황표에서 캐릭터를 저장해 줘.";
+    result.textContent = profile && !eligible ? "마법사 계열 직업만 마탑을 조사할 수 있어." : record ? towerText(profile, record) : profile ? "마탑에 남은 낡은 기록을 조사할 수 있어. 발견한 단서는 캐릭터에 저장돼." : "먼저 현황표에서 캐릭터를 저장해 줘.";
     copy.hidden = !record || !eligible;
   }
 
   function installTower(doc, profile) {
     if (!doc.getElementById("result") || doc.getElementById("villageTowerPanel")) return;
+    const villagePanel = doc.createElement("section");
+    villagePanel.id = "subVillagePanel";
+    villagePanel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
+    villagePanel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>발견 기록은 캐릭터별로 저장돼. 이동을 다시 판정하거나 다른 구간으로 이동해도 사라지지 않아.</p>';
     const panel = doc.createElement("section");
     panel.id = "villageTowerPanel";
-    panel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
-    panel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>이동 판정에서 발견한 서브마을이 자동으로 표시돼. 마탑 조사는 마법사 계열만 가능해. 현재 지역의 중심 마을 또는 발견한 서브마을의 마탑을 선택해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
-    doc.getElementById("result").after(panel);
+    panel.style.cssText = villagePanel.style.cssText;
+    panel.innerHTML = '<h3>마탑</h3><p>마법사 계열만 마탑의 기록을 조사할 수 있어.</p><input id="towerVillage" type="hidden" value="마탑"><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
+    doc.getElementById("result").after(villagePanel);
+    villagePanel.after(panel);
     doc.getElementById("towerInvestigate").addEventListener("click", () => {
       const select = doc.getElementById("towerVillage");
       try {
