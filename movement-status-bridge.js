@@ -380,7 +380,25 @@
     const offers = SUB_VILLAGE_QUESTS.filter(q => known.has(q.village));
     if (!offers.length) { list.innerHTML = '<p>서브마을을 발견하면 그 마을의 기존 퀘스트가 여기에 표시돼.</p>'; return; }
     const groups = [...new Set(offers.map(q => q.village))];
-    list.innerHTML = '<h4>발견한 마을 퀘스트</h4><p>기존 마을 의뢰야. 수락 조건과 다음 단계, 완료·보상은 운영자가 확인해.</p>' + groups.map(village => '<section style="margin-top:14px"><h4>' + escapePet(village) + ' · ' + offers.filter(q => q.village === village).length + '개 의뢰</h4>' + offers.filter(q => q.village === village).map((q,i) => '<details data-village-quest="' + escapePet(q.id) + '"' + (i===0?' open':'') + ' style="margin:9px 0;padding:12px;border:1px solid #655936;border-radius:8px"><summary style="cursor:pointer;font-weight:800">' + escapePet(q.title) + ' · ' + escapePet(q.grade) + '</summary><p><b>발견 단서</b> · ' + escapePet(q.clue) + '</p><p>' + escapePet(q.arrival) + '</p><p><b>첫 목표</b> · ' + escapePet(q.objective) + '</p><p><b>공개 보상</b> · ' + q.rewards.map(escapePet).join(' · ') + '</p><small>추가 선행 조건과 다음 단계는 운영자에게 확인해.</small></details>').join('') + '</section>').join('');
+    list.innerHTML = '<h4>발견한 마을 퀘스트</h4><p>퀘스트를 받으면 현재 캐릭터에 저장돼. 진행 조건과 다음 단계, 완료·보상은 운영자가 확인해.</p>' + groups.map(village => '<section style="margin-top:14px"><h4>' + escapePet(village) + ' · ' + offers.filter(q => q.village === village).length + '개 의뢰</h4>' + offers.filter(q => q.village === village).map((q,i) => '<details data-village-quest="' + escapePet(q.id) + '"' + (i===0?' open':'') + ' style="margin:9px 0;padding:12px;border:1px solid #655936;border-radius:8px"><summary style="cursor:pointer;font-weight:800">' + escapePet(q.title) + ' · ' + escapePet(q.grade) + '</summary><p><b>발견 단서</b> · ' + escapePet(q.clue) + '</p><p>' + escapePet(q.arrival) + '</p><p><b>첫 목표</b> · ' + escapePet(q.objective) + '</p><p><b>공개 보상</b> · ' + q.rewards.map(escapePet).join(' · ') + '</p><p><button type="button" data-accept-village-quest="' + escapePet(q.id) + '"' + (profile?.data?.villageQuests?.[q.id] ? ' disabled' : '') + ' style="min-height:44px;padding:10px 14px;cursor:pointer">' + (profile?.data?.villageQuests?.[q.id] ? '받은 퀘스트 · 진행 조건 확인 필요' : '퀘스트 받기') + '</button></p><small>추가 선행 조건과 다음 단계는 운영자에게 확인해.</small></details>').join('') + '</section>').join('');
+    list.querySelectorAll?.('[data-accept-village-quest]').forEach(button => button.addEventListener('click', () => {
+      const store = read(PROFILE_KEY, null), current = activeProfile(store);
+      // A stale card must never accept a quest for a different character.
+      if (!current || current.id !== profile.id) { renderVillageQuests(doc, current); return; }
+      const quest = SUB_VILLAGE_QUESTS.find(q => q.id === button.dataset.acceptVillageQuest);
+      const found = current.data?.subVillageExploration?.discovered;
+      if (!quest || !Array.isArray(found) || !found.some(v => v?.name === quest.village)) return;
+      const records = current.data.villageQuests || {};
+      if (records[quest.id]) { renderVillageQuests(doc, current); return; }
+      const previous = current.updatedAt;
+      current.data.villageQuests = {...records, [quest.id]: {id:quest.id, village:quest.village, title:quest.title, status:'accepted', eligibility:'operator-review', acceptedAt:new Date().toISOString()}};
+      current.updatedAt = new Date().toISOString();
+      try { write(PROFILE_KEY, store); }
+      catch (_) { current.data.villageQuests = records; current.updatedAt = previous; notice(doc, '퀘스트 저장에 실패했어. 저장 공간을 확인한 뒤 다시 받아 줘.', false); return; }
+      renderVillageQuests(doc, current);
+      window.dispatchEvent(new Event('our-rpg:profiles-updated'));
+      notice(doc, quest.title + ' 퀘스트를 받았어. 진행 조건과 다음 단계는 운영자에게 확인해.', true);
+    }));
   }
 
   function discoverVillage(store, profile, move, roll = () => Math.floor(Math.random() * 100) + 1) {
