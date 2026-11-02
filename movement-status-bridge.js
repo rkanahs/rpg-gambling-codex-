@@ -76,6 +76,21 @@
     return String(value || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
 
+  function petChoiceGrade(pet) {
+    if (/^HP-(?:[1-9]|1[0-3])$/.test(pet.hiddenPetCode || '')) return '히든';
+    const grade = String(pet.rarity || pet.grade || '').trim().toUpperCase().replace(/급$/, '');
+    if (['HIDDEN', '히든'].includes(grade)) return '히든';
+    return ['SSS', 'SS', 'S', 'A', 'B', 'N'].includes(grade) ? grade : '등급 미기록';
+  }
+  function groupedPetOptions(pets) {
+    return ['히든', 'SSS', 'SS', 'S', 'A', 'B', 'N', '등급 미기록'].map(grade => {
+      const group = pets.filter(pet => petChoiceGrade(pet) === grade);
+      if (!group.length) return '';
+      const label = grade + (grade === '히든' || grade === '등급 미기록' ? '' : '급') + ' · ' + group.length + '종';
+      return '<optgroup label="' + escapePet(label) + '">' + group.map(pet => '<option value="' + escapePet(pet.name) + '">[' + escapePet(grade) + '] ' + escapePet(pet.name) + '</option>').join('') + '</optgroup>';
+    }).join('');
+  }
+
   function petSwitchMessage(doc, text, bad = false) {
     const box = doc.getElementById("movementPetSwitchNotice");
     if (box) { box.textContent = text; box.style.color = bad ? "#f09595" : "#7dd5a5"; }
@@ -94,7 +109,7 @@
     const pets = ownedPets(profile), current = movementPetData(profile).petName || "";
     select.innerHTML = '<option value="">동행 해제</option>' +
       (current && !pets.some(pet => pet.name === current) ? '<option value="'+escapePet(current)+'" disabled>'+escapePet(current)+' · 기존 동행</option>' : '') +
-      pets.map(pet => '<option value="'+escapePet(pet.name)+'">'+escapePet(pet.name)+(pet.rarity || pet.grade ? ' · '+escapePet(pet.rarity || pet.grade) : '')+'</option>').join('');
+      groupedPetOptions(pets);
     select.value = current;
     select.dataset.ownerId = profile?.id || "";
     select.disabled = !profile;
