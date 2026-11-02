@@ -184,8 +184,8 @@
       region.dispatchEvent(new Event("change", { bubbles: true }));
     }
     doc.movementProfileId = profile.id;
-    const villages = data.subVillageExploration?.discovered;
-    const known = Array.isArray(villages) && villages.length ? " · 발견한 서브 마을: " + villages.map(v => v.name).join(", ") : " · 이동 후 도착 구간의 서브 마을을 별도로 판정해.";
+    const visit = currentVillage(profile);
+    const known = visit ? " · 현재 서브마을: " + visit.name : " · 이동 후 도착 구간의 서브마을을 별도로 판정해.";
     notice(doc, (data.characterName || data.playerName || "현재 캐릭터") + "의 현황을 불러왔어. 이동 판정이 끝나면 누적 거리와 지역이 자동 저장돼." + known, true);
     return profile;
   }
