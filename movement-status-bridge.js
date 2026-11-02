@@ -578,11 +578,35 @@
     renderTower(doc, profile);
   }
 
+  function installResultCodexLinks(doc) {
+    const result = doc.getElementById("result");
+    if (!result || doc.getElementById("movementResultCodexLinks")) return;
+    const links = doc.createElement("nav");
+    links.id = "movementResultCodexLinks";
+    links.setAttribute("aria-label", "판정 결과 도감 바로가기");
+    links.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin:12px 0";
+    const add = (label, action) => {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.style.cssText = "min-height:44px;padding:10px 14px;border:1px solid #a78a48;border-radius:6px;background:#302911;color:#f4df9b;font-weight:800;cursor:pointer";
+      button.addEventListener("click", action);
+      links.append(button);
+    };
+    add("도감으로 가기", () => document.getElementById("viewerBack")?.click());
+    add("서브마을 퀘스트 보기", () => doc.getElementById("subVillagePanel")?.scrollIntoView({behavior:"smooth", block:"start"}));
+    for (const [label, slug] of [["몬스터 전투", "our-rpg-monster-battle"], ["상자 도감", "our-rpg-treasure-codex"]]) {
+      add(label, () => document.querySelector('a[href="' + slug + '/"]')?.click());
+    }
+    result.after(links);
+  }
+
   function bind(doc) {
     const judge = doc && doc.getElementById("judge");
     if (!judge || judge.dataset.statusBridge === "1") return;
     judge.dataset.statusBridge = "1";
     loadProfile(doc);
+    installResultCodexLinks(doc);
     const petSelect = doc.getElementById("movementPetSelect"), petChange = doc.getElementById("movementPetChange");
     if (petSelect) petSelect.addEventListener("change", () => petSwitchButton(doc, activeProfile(read(PROFILE_KEY, null))));
     if (petChange) petChange.addEventListener("click", () => switchMovementPet(doc));
