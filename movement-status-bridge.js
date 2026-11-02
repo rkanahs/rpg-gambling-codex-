@@ -286,6 +286,7 @@
       return;
     }
     showVillageResult(doc, move);
+    if (activeProfile(store)?.id === profile.id) renderTower(doc, profile, move.subVillage?.success ? move.subVillage.name : "");
     const total = doc.getElementById("total");
     if (total) total.value = String(data.distance);
     window.dispatchEvent(new StorageEvent("storage", { key: PROFILE_KEY, newValue: JSON.stringify(store) }));
@@ -338,14 +339,20 @@
     return "[우리들의 RPG · 마탑 조사 기록]\n캐릭터: " + (profile.data.characterName || profile.data.playerName || "현재 캐릭터") + "\n조사 장소: " + record.village + " 마탑\n발견: ??? · 낡은 기록\n단서: " + record.hint + "\n발견 시각: " + record.at + "\n단서는 운영자에게 보여 줘. 후속 조건·전직·보상은 운영자가 확인해.";
   }
 
-  function renderTower(doc, profile) {
+  function renderTower(doc, profile, discoveredVillage = "") {
     const panel = doc.getElementById("villageTowerPanel");
     if (!panel) return;
     const select = doc.getElementById("towerVillage"), button = doc.getElementById("towerInvestigate"), result = doc.getElementById("towerClueResult"), copy = doc.getElementById("towerClueCopy");
     const locations = profile?.data ? towerLocations(profile) : [];
-    const previous = select.value;
+    const previous = select.dataset.ownerId === profile?.id ? select.value : "";
+    const nearby = locations.slice(1);
+    const last = read(MOVE_KEY, null);
+    const lastFound = last?.characterId === profile?.id && Number(last.currentCoordinate) === Number(profile?.data?.distance) && last.subVillage?.success ? last.subVillage.name : "";
+    const selectedVillage = nearby.includes(discoveredVillage) ? discoveredVillage : locations.includes(previous) ? previous : nearby.includes(lastFound) ? lastFound : locations[0];
+    const villageStatus = doc.getElementById("subVillageStatus");
+    if (villageStatus) villageStatus.textContent = nearby.length ? (nearby.includes(lastFound) ? "이번 이동에서 발견한 서브마을 · " + lastFound + "\n" : "") + "현재 방문 가능한 서브마을 · " + nearby.join(", ") : profile?.data ? "현재 구간에서 발견한 서브마을이 없어. 이동 판정에서 발견하면 여기에 자동으로 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
     select.innerHTML = locations.map(v => '<option value="' + escapePet(v) + '">' + escapePet(v) + ' 마탑</option>').join("");
-    if (locations.includes(previous)) select.value = previous;
+    if (selectedVillage) select.value = selectedVillage;
     select.dataset.ownerId = profile?.id || "";
     const eligible = canInvestigateTower(profile);
     select.disabled = !eligible;
@@ -361,7 +368,7 @@
     const panel = doc.createElement("section");
     panel.id = "villageTowerPanel";
     panel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
-    panel.innerHTML = '<h3>마을 마탑</h3><p>마법사 계열만 조사할 수 있어. 현재 지역의 중심 마을 또는 도착 구간에서 발견한 서브 마을의 마탑을 선택해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
+    panel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>이동 판정에서 발견한 서브마을이 자동으로 표시돼. 마탑 조사는 마법사 계열만 가능해. 현재 지역의 중심 마을 또는 발견한 서브마을의 마탑을 선택해.</p><label>조사할 마탑<select id="towerVillage"></select></label><button type="button" id="towerInvestigate">마탑 기록 조사</button><pre id="towerClueResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"></pre><button type="button" id="towerClueCopy" hidden>단서 기록 복사</button>';
     doc.getElementById("result").after(panel);
     doc.getElementById("towerInvestigate").addEventListener("click", () => {
       const select = doc.getElementById("towerVillage");
