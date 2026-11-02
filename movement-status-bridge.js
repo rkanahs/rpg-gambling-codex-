@@ -197,6 +197,192 @@
     ["잿빛초소", "경계", 16000, 17500], ["별잠 마을", "경계", 21000, Infinity]
   ];
 
+  // Player-facing excerpts from the existing twelve village quests only.
+  // Puzzle answers, outcomes and private follow-up/class conditions stay in the operator book.
+  const SUB_VILLAGE_QUESTS = [
+  {
+    "id": "dawn-bell",
+    "village": "이슬고개",
+    "grade": "I등급",
+    "title": "🔔 달아난 새벽종",
+    "clue": "풀숲에서 아주 작은 종소리가 들립니다. 소리는 가까워지다가 갑자기 뚝 끊겼습니다.",
+    "arrival": "이슬 맺힌 돌담 너머로, 지도에 없던 작은 마을과 텅 빈 종루가 나타납니다.",
+    "objective": "새벽 전에 종이 굴러간 흔적을 세 곳 조사한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 6%",
+      "구리동전 100",
+      "새벽이슬 연고 1개 — 전투 종료 후 체력 소량 회복"
+    ]
+  },
+  {
+    "id": "upside-herbs",
+    "village": "이슬고개",
+    "grade": "II등급",
+    "title": "🌿 거꾸로 자란 약초밭",
+    "clue": "흙이 하늘로 떨어지는 이상한 발자국이 밭 쪽으로 이어집니다.",
+    "arrival": "약초들은 뿌리를 하늘로 뻗은 채 바람도 없이 흔들리고 있습니다.",
+    "objective": "뿌리가 하늘을 향한 약초밭의 원인을 조사한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 12%",
+      "실버동전 10",
+      "대지의 제작 조각 1개",
+      "이슬고개 호감도 +1"
+    ]
+  },
+  {
+    "id": "lost-windmill-song",
+    "village": "바람씨앗 마을",
+    "grade": "I등급",
+    "title": "🎶 노래를 잃은 풍차",
+    "clue": "바람은 부는데 풍차의 그림자만 멈춰 있습니다. 멀리서 세 음의 종소리가 들립니다.",
+    "arrival": "하얀 풍차들이 고개를 숙인 듯 멈춰 있고, 중앙 풍차만 희미하게 떨립니다.",
+    "objective": "세 풍차의 날개 방향을 기록한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 7%",
+      "구리동전 120",
+      "순풍 깃털 1개 — 다음 일반 이동 판정 보조, 발견 판정에는 미적용"
+    ]
+  },
+  {
+    "id": "rain-in-a-bottle",
+    "village": "바람씨앗 마을",
+    "grade": "II등급",
+    "title": "🌧️ 병 속에 갇힌 비",
+    "clue": "구름 한 점 없는데 어깨 위로 빗방울 하나가 떨어졌습니다. 빗방울은 풍차를 향해 굴러갑니다.",
+    "arrival": "푸른 유리병 안에서 손바닥만 한 먹구름이 천천히 돌고 있습니다.",
+    "objective": "이동 중 맑은 하늘에서 떨어진 빗방울을 추적한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 14%",
+      "실버동전 12",
+      "맑은비 물약 1개 — 상태이상 1개 해제"
+    ]
+  },
+  {
+    "id": "letter-under-roots",
+    "village": "은뿌리 마을",
+    "grade": "II등급",
+    "title": "✉️ 뿌리 아래 묻힌 편지",
+    "clue": "땅 위로 나온 은빛 뿌리 아래에서 오래된 종이 모서리가 보입니다.",
+    "arrival": "지도에 없던 집들이 거대한 뿌리 사이에 조용히 기대어 서 있습니다.",
+    "objective": "은빛 뿌리를 훼손하지 않고 편지를 꺼낸다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 11%",
+      "실버동전 8",
+      "은뿌리 마을 호감도 +1"
+    ]
+  },
+  {
+    "id": "sleeping-antler",
+    "village": "은뿌리 마을",
+    "grade": "III등급",
+    "title": "🦌 잠든 사슴왕의 뿔",
+    "clue": "나뭇가지 사이에 걸린 커다란 뿔에서 아주 느린 심장 소리가 들립니다.",
+    "arrival": "뿔이 향한 숲길의 발자국들은 모두 제자리에서 끝나 있습니다.",
+    "objective": "사냥꾼이 주운 왕관 모양 뿔의 주인을 조사한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 25%",
+      "실버동전 40",
+      "칭호 ‘숲의 손님’"
+    ]
+  },
+  {
+    "id": "second-moon-ferry",
+    "village": "달그늘 나루",
+    "grade": "II등급",
+    "title": "🛶 두 번째 달의 나룻배",
+    "clue": "물도 없는데 발밑에 달이 비칩니다. 멀리서 나무배가 다가오는 소리가 들립니다.",
+    "arrival": "검은 강 위에 같은 달이 두 개 떠 있고, 얼굴 없는 뱃사공이 노를 세웁니다.",
+    "objective": "물 위에 비친 두 달을 관찰하고 나루를 건널 방법을 조사한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 13%",
+      "실버동전 14",
+      "달물 부적 1개 — 공포 또는 혼란 1회 저항"
+    ]
+  },
+  {
+    "id": "nameless-ferryman",
+    "village": "달그늘 나루",
+    "grade": "I등급",
+    "title": "🏮 이름 없는 뱃사공",
+    "clue": "나루 아래에서 꺼진 등불 하나가 물살을 거슬러 떠오릅니다.",
+    "arrival": "뱃사공은 가면을 쓴 채 텅 빈 등불 고리만 바라보고 있습니다.",
+    "objective": "나루터 아래에서 꺼진 등불을 찾는다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 6%",
+      "구리동전 150",
+      "달그늘 무료 승선권 1개 — 퀘스트 이동에만 사용"
+    ]
+  },
+  {
+    "id": "last-beacon",
+    "village": "잿빛초소",
+    "grade": "III등급",
+    "title": "🔥 마지막 봉화의 불씨",
+    "clue": "재가 내리는 하늘 아래, 꺼진 줄 알았던 봉화가 한 번 붉게 깜박입니다.",
+    "arrival": "성벽 위 마지막 불씨를 둘러싸고 빈 갑옷들이 원을 이루고 있습니다.",
+    "objective": "재폭풍 속에서 봉화 재료 세 묶음을 모은다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 26%",
+      "실버동전 45",
+      "칭호 ‘불씨를 지킨 자’"
+    ]
+  },
+  {
+    "id": "armorless-guard",
+    "village": "잿빛초소",
+    "grade": "II등급",
+    "title": "🛡️ 갑옷 없는 파수꾼",
+    "clue": "주인 없는 갑옷이 길 한가운데 서서 오래된 전장을 가리킵니다.",
+    "arrival": "재 아래에 묻힌 이름표들이 약한 빛을 내고, 주변에는 손대지 않은 무기들이 널려 있습니다.",
+    "objective": "빈 갑옷이 가리키는 전장을 조사한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 12%",
+      "실버동전 12",
+      "파수의 철편 1개 — 받는 피해 1회 소폭 감소"
+    ]
+  },
+  {
+    "id": "unfallen-star",
+    "village": "별잠 마을",
+    "grade": "III등급",
+    "title": "🌠 떨어지지 않는 별",
+    "clue": "같은 별이 세 번 깜박인 뒤, 손안에 들어올 만큼 가까워 보입니다.",
+    "arrival": "별잠 마을의 관측대 위에서 작은 별씨앗이 심장처럼 뛰고 있습니다.",
+    "objective": "세 번의 밤 이동에서 같은 별의 깜박임을 기록한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 28%",
+      "실버동전 55",
+      "별잠 가루 1개 — 전투당 1회 자신의 일반 스킬 쿨타임 1턴 감소"
+    ]
+  },
+  {
+    "id": "name-eating-bell",
+    "village": "별잠 마을",
+    "grade": "II등급",
+    "title": "🕯️ 이름을 먹는 종",
+    "clue": "소리 없는 종이 흔들릴 때마다 가까운 비석의 글자가 한 글자씩 사라집니다.",
+    "arrival": "종 아래에는 이름 대신 별과 나무, 파도 모양만 남은 비석 세 개가 서 있습니다.",
+    "objective": "이름이 지워진 세 비석의 상징을 기록한다.",
+    "rewards": [
+      "다음 레벨 필요 EXP의 12%",
+      "실버동전 10",
+      "별명패 1개 — 능력치 없는 기념 토큰",
+      "별잠 마을 호감도 +1"
+    ]
+  }
+];
+
+  function renderVillageQuests(doc, profile) {
+    const list = doc.getElementById("subVillageQuestList");
+    if (!list) return;
+    const found = profile?.data?.subVillageExploration?.discovered;
+    const known = new Set((Array.isArray(found) ? found : []).map(v => v?.name));
+    const offers = SUB_VILLAGE_QUESTS.filter(q => known.has(q.village));
+    if (!offers.length) { list.innerHTML = '<p>서브마을을 발견하면 그 마을의 기존 퀘스트가 여기에 표시돼.</p>'; return; }
+    const groups = [...new Set(offers.map(q => q.village))];
+    list.innerHTML = '<h4>발견한 마을 퀘스트</h4><p>기존 마을 의뢰야. 수락 조건과 다음 단계, 완료·보상은 운영자가 확인해.</p>' + groups.map(village => '<section style="margin-top:14px"><h4>' + escapePet(village) + ' · ' + offers.filter(q => q.village === village).length + '개 의뢰</h4>' + offers.filter(q => q.village === village).map((q,i) => '<details data-village-quest="' + escapePet(q.id) + '"' + (i===0?' open':'') + ' style="margin:9px 0;padding:12px;border:1px solid #655936;border-radius:8px"><summary style="cursor:pointer;font-weight:800">' + escapePet(q.title) + ' · ' + escapePet(q.grade) + '</summary><p><b>발견 단서</b> · ' + escapePet(q.clue) + '</p><p>' + escapePet(q.arrival) + '</p><p><b>첫 목표</b> · ' + escapePet(q.objective) + '</p><p><b>공개 보상</b> · ' + q.rewards.map(escapePet).join(' · ') + '</p><small>추가 선행 조건과 다음 단계는 운영자에게 확인해.</small></details>').join('') + '</section>').join('');
+  }
+
   function discoverVillage(store, profile, move, roll = () => Math.floor(Math.random() * 100) + 1) {
     if (move.subVillage) return move.subVillage;
     const coordinate = Number(move.currentCoordinate);
@@ -348,6 +534,7 @@
     const nearby = profile?.data ? towerLocations(profile).slice(1) : [];
     const villageStatus = doc.getElementById("subVillageStatus");
     if (villageStatus) villageStatus.textContent = known.length ? "발견한 서브마을 · " + known.join(", ") + "\n" + (nearby.length ? "현재 구간의 서브마을 · " + nearby.join(", ") : "현재 이동 구간 밖에 있어도 발견 기록은 유지돼.") : profile?.data ? "아직 발견한 서브마을이 없어. 이동 판정에서 발견하면 여기에 계속 표시돼." : "현황표에서 캐릭터를 먼저 선택해 줘.";
+    renderVillageQuests(doc, profile);
     select.value = "마탑";
     select.dataset.ownerId = profile?.id || "";
     const eligible = canInvestigateTower(profile);
@@ -363,7 +550,7 @@
     const villagePanel = doc.createElement("section");
     villagePanel.id = "subVillagePanel";
     villagePanel.style.cssText = "margin-top:18px;padding:16px;border:1px solid #807248;border-radius:8px;line-height:1.65";
-    villagePanel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>발견 기록은 캐릭터별로 저장돼. 이동을 다시 판정하거나 다른 구간으로 이동해도 사라지지 않아.</p>';
+    villagePanel.innerHTML = '<h3>서브마을</h3><p id="subVillageStatus" role="status" style="white-space:pre-line"></p><p>발견 기록은 캐릭터별로 저장돼. 이동을 다시 판정하거나 다른 구간으로 이동해도 사라지지 않아.</p><div id="subVillageQuestList"></div>';
     const panel = doc.createElement("section");
     panel.id = "villageTowerPanel";
     panel.style.cssText = villagePanel.style.cssText;
