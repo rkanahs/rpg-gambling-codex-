@@ -1,0 +1,5 @@
+(()=>{'use strict';const API='https://rpg-market-casino.spicy-wren-9157.chatgpt.site/api/quest-reviews',P='our-rpg-player-profiles-v2',S='RPG_CLOUD_DEVICE_SESSION_V1',read=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}};
+function current(){const p=read(P);return p?.profiles?.find(x=>x.id===p.activeId)||p?.profiles?.[0]}
+async function call(owner,quest){const s=read(S),p=current();if(!s?.token||s.expiresAt<=Date.now())throw Error('기기간 연동을 연결한 뒤 요청해 줘.');if(!p||p.id!==owner)throw Error('캐릭터가 바뀌었어. 진행판을 다시 확인해 줘.');const r=await fetch(API+(quest?'':'?characterId='+encodeURIComponent(owner)),{method:quest?'POST':'GET',headers:{Authorization:'Bearer '+s.token,...(quest?{'Content-Type':'application/json'}:{})},...(quest?{body:JSON.stringify({characterId:owner,quest})}:{}),cache:'no-store',signal:AbortSignal.timeout(15000)}),out=await r.json();if(read(S)?.token!==s.token||current()?.id!==owner)throw Error('연결 계정이나 캐릭터가 바뀌었어.');if(!r.ok)throw Error(out.error||'퀘스트 확인 서버에 연결하지 못했어.');return out}
+globalThis.RpgQuestReviews=Object.freeze({current,request:(quest,owner)=>call(owner,quest),list:owner=>call(owner)});
+})();
