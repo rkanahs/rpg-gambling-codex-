@@ -16,7 +16,7 @@
         ["plain-antidote", "🌿", "초급 해독제", 80, "중독 1개 제거", "구리동전 80개", 99],
         ["plain-guard", "🛡️", "견습 방어 물약", 150, "전투 종료까지 방어력 +10%", "구리동전 150개", 99],
         ["plain-agility", "💨", "민첩 물약", 180, "전투 종료까지 이속 +10%", "구리동전 180개", 99],
-        ["return", "📜", "귀환서", 5000, "전투 밖에서 마지막 안전 마을로 귀환", "실버동전 50개", 99]
+        ["return", "📜", "귀환서", 5000, "전투를 종료하고 마지막 안전 마을로 귀환", "실버동전 50개", 99]
       ]
     },
     {
@@ -30,7 +30,7 @@
         ["continent-power", "⚔️", "전투 강화 물약", 60000, "전투 종료까지 공격력·마력 +15%", "골드동전 6개", 99],
         ["continent-guard", "🛡️", "수호 물약", 60000, "전투 종료까지 방어력 +20%", "골드동전 6개", 99],
         ["continent-speed", "💨", "신속 물약", 70000, "전투 종료까지 이속 +20%", "골드동전 7개", 99],
-        ["return", "📜", "귀환서", 50000, "전투 밖에서 마지막 안전 마을로 귀환", "골드동전 5개", 99]
+        ["return", "📜", "귀환서", 50000, "전투를 종료하고 마지막 안전 마을로 귀환", "골드동전 5개", 99]
       ]
     },
     {
@@ -45,7 +45,7 @@
         ["border-fortress", "🛡️", "철벽 물약", 400000, "전투 종료까지 방어력 +30%", "골드동전 40개", 99],
         ["border-ultraspeed", "💨", "초신속 물약", 450000, "전투 종료까지 이속 +30%", "골드동전 45개", 99],
         ["border-full-heal", "❤️", "완전 회복 물약", 1000000, "HP를 최대치까지 회복 · 부활 불가", "골드동전 100개", 99],
-        ["return", "📜", "귀환서", 100000, "전투 밖에서 마지막 안전 마을로 귀환", "골드동전 10개", 99]
+        ["return", "📜", "귀환서", 100000, "전투를 종료하고 마지막 안전 마을로 귀환", "골드동전 10개", 99]
       ]
     }
   ];
@@ -55,7 +55,7 @@
     p2: ["⚗️", "중급 회복 물약", "체력 40% 회복"],
     p3: ["🍷", "상급 회복 물약", "체력 70% 회복"],
     clean: ["💠", "상태 회복 물약", "일반 상태이상 1개 해제"],
-    return: ["📜", "귀환서", "전투 밖에서 마지막 안전 마을로 귀환"]
+    return: ["📜", "귀환서", "전투를 종료하고 마지막 안전 마을로 귀환"]
   };
 
   function read(key, fallback) {
@@ -236,7 +236,7 @@
           const out = api.useOutsideBattle(owner, item[0]);
           render(doc);
           const box = doc.getElementById("rpgInventory")?.querySelector("#invMsg");
-          if (box) box.textContent = `✓ ${out.item.name} 사용 · HP ${out.result.before} → ${out.result.after} / ${out.result.max} (+${out.result.healed})`;
+          if (box) box.textContent = out.result.message ? `✓ ${out.item.name} 사용 · ${out.result.message}` : `✓ ${out.item.name} 사용 · HP ${out.result.before} → ${out.result.after} / ${out.result.max} (+${out.result.healed})`;
         } catch (error) {
           message(`사용하지 못했어 · ${error.message || "저장 오류. 잠시 후 다시 시도해 줘."}`, true);
         }

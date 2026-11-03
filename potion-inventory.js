@@ -5,6 +5,7 @@ const rows=[
 ['continent-medium-heal','중형 회복 물약','healPercent',25,'최대 HP 25% 회복'],['continent-cleanse','종합 해독제','cleanse',1,'해제 가능한 일반 상태이상 1개 제거'],['continent-power','전투 강화 물약','buff',{atk:15,mag:15},'전투 종료까지 공격력·마력 +15%'],['continent-guard','수호 물약','buff',{def:20},'전투 종료까지 방어력 +20%'],['continent-speed','신속 물약','buff',{spd:20},'전투 종료까지 이속 +20%'],
 ['border-large-heal','대형 회복 물약','healPercent',45,'최대 HP 45% 회복'],['border-cleanse','고급 정화 물약','cleanse',Infinity,'해제 가능한 일반 상태이상 전부 제거'],['border-hero','영웅의 물약','buff',{atk:25,mag:25},'전투 종료까지 공격력·마력 +25%'],['border-fortress','철벽 물약','buff',{def:30},'전투 종료까지 방어력 +30%'],['border-ultraspeed','초신속 물약','buff',{spd:30},'전투 종료까지 이속 +30%'],['border-full-heal','완전 회복 물약','fullHeal',100,'HP를 최대치까지 회복 · 부활 불가 · 전투당 1회'],
 ['p1','초급 회복 물약','healPercent',20,'최대 HP 20% 회복'],['p2','중급 회복 물약','healPercent',40,'최대 HP 40% 회복'],['p3','상급 회복 물약','healPercent',70,'최대 HP 70% 회복'],['clean','상태 회복 물약','cleanse',1,'해제 가능한 일반 상태이상 1개 제거'],['codex-heal','회복 물약','heal',100,'HP 100 회복'],['codex-large-heal','큰 회복 물약','heal',500,'HP 500 회복'],['codex-antidote','해독 물약','poison',1,'중독 1개 제거'],['codex-cleanse','정화 물약','cleanse',1,'해제 가능한 일반 상태이상 1개 제거']];
+rows.push(['return','귀환서','return',1,'전투를 종료하고 마지막 안전 마을로 귀환 · 1회용'], ['crafted-cleanse','완전 해제 영약','cleanse',2,'해제 가능한 일반 상태이상 2개 제거']);
 const catalog=Object.fromEntries(rows.map(([id,name,kind,value,effect])=>[id,{id,name,kind,value,effect}]));
 function read(k,f){try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}}
 function amount(n){return Number.isSafeInteger(Number(n))&&Number(n)>0?Number(n):0}
@@ -19,10 +20,69 @@ function bagFor(profile){const d=profile.data;if(!d.potionBag||d.potionBag.versi
 let repairing=false;
 function repairChests(){if(repairing)return false;repairing=true;try{const store=read(KEY,null);if(!Array.isArray(store?.profiles))return false;let changed=false;for(const p of store.profiles){const d=p.data;if(!d||!(d.ordinaryChestReceipts?.some(x=>x.reward?.kind==='consumable')||d.bossChests?.some(x=>x.opened&&x.reward?.type==='consumable')||/^\[(?:일반 보물상자|희귀 보물상자|전설 보물상자|보스 상자)\]/m.test(d.consumables||'')))continue;const before=JSON.stringify(d);bagFor(p);if(JSON.stringify(d)!==before){p.updatedAt=new Date().toISOString();changed=true}}if(changed)save(store);return changed}catch(_){return false}finally{repairing=false}}
 
-function context(owner){const store=read(KEY,null),p=store?.profiles?.find(x=>x.id===store.activeId)||store?.profiles?.[0];if(!p||owner&&p.id!==owner)throw Error('포션을 사용할 캐릭터를 현황표에서 선택해 줘.');return{store,profile:p,bag:bagFor(p)}}
+// Explicit inventory lines are live quantities. Chest receipt lines are imported by bagFor.
+function recordedItems(data) {
+  return String(data.consumables || '').split('\n').flatMap((line, index) => {
+    const match = line.trim().match(/^(?:\[제작\]\s*)?(.+?)\s*(?:[×x]\s*(\d+)|(\d+)\s*개)?$/);
+    if (!match) return [];
+    const item = Object.values(catalog).find(item => item.name === match[1].trim());
+    const quantity = amount(match[2] || match[3] || 1);
+    return item && quantity ? [{...item, id: 'record:' + encodeURIComponent(line), catalogId: item.id, quantity, line, index}] : [];
+  });
+}
+function ownedItems(profile) {
+  const bag = bagFor(profile);
+  const stored = Object.entries(bag.items).filter(([, n]) => amount(n)).map(([id, n]) => ({
+    ...(catalog[id] || {id, name: id, kind: 'unsupported', effect: '사용 효과가 아직 등록되지 않은 소모품이야.'}), quantity: amount(n)
+  }));
+  return [...stored, ...recordedItems(profile.data)];
+}
+const safeTowns = [
+  ['해오름뜰', '평원 · 해오름뜰', 0], ['큰길마루', '대륙 · 큰길마루', 5000], ['끝빛보루', '경계 · 끝빛보루', 15000],
+  ['이슬고개', '평원 · 해오름뜰', 700], ['바람씨앗 마을', '평원 · 해오름뜰', 3100],
+  ['은뿌리 마을', '대륙 · 큰길마루', 6300], ['달그늘 나루', '대륙 · 큰길마루', 11100],
+  ['잿빛초소', '경계 · 끝빛보루', 16000], ['별잠 마을', '경계 · 끝빛보루', 21000]
+];
+function returnToTown(data) {
+  const distance = Number(data.distance || 0);
+  if (!Number.isSafeInteger(distance) || distance < 0) throw Error('현황표 이동거리를 확인해 줘.');
+  const region = distance >= 15000 ? safeTowns[2] : distance >= 5000 ? safeTowns[1] : safeTowns[0];
+  const saved = data.lastSafeTown;
+  const visit = data.subVillageExploration?.currentVisit;
+  const found = data.subVillageExploration?.discovered || [];
+  const known = safeTowns.find(town => town[0] === (saved?.name || visit?.name) && town[1] === region[1]);
+  const target = known && (safeTowns.indexOf(known) < 3 || found.some(x => x.name === known[0])) ? known : region;
+  const recorded = Number(saved?.distance);
+  const coordinate = saved?.name === target[0] && Number.isSafeInteger(recorded) && recorded >= target[2] && recorded <= distance ? recorded : target[2];
+  data.distance = String(coordinate);
+  data.region = target[1];
+  data.expNeeded = String(coordinate >= 15000 ? 15000 : coordinate >= 5000 ? 1000 : 500);
+  data.lastMovement = new Date().toISOString() + ' · 귀환서 사용 · ' + target[0] + ' 귀환';
+  data.lastSafeTown = {name: target[0], region: target[1], distance: coordinate};
+  if (data.subVillageExploration) data.subVillageExploration.currentVisit = safeTowns.indexOf(target) >= 3 ? {name: target[0], at: new Date().toISOString()} : null;
+  return {message: target[0] + ' 귀환 · 누적 거리 ' + distance + ' → ' + coordinate, town: target[0]};
+}
+function context(owner){const store=read(KEY,null),p=store?.profiles?.find(x=>x.id===store.activeId)||store?.profiles?.[0];if(!p||owner&&p.id!==owner)throw Error('소모품을 사용할 캐릭터를 현황표에서 선택해 줘.');return{store,profile:p,bag:bagFor(p)}}
 function save(store){localStorage.setItem(KEY,JSON.stringify(store));try{globalThis.dispatchEvent?.(new CustomEvent('our-rpg:profiles-updated'));globalThis.dispatchEvent?.(new StorageEvent('storage',{key:KEY,newValue:JSON.stringify(store)}))}catch(_){}}
-function consume(owner,id,apply){const c=context(owner),item=catalog[id];if(!item)throw Error('이 소모품은 전투용 포션이 아니야.');const count=amount(c.bag.items[id]);if(!count)throw Error('보유한 포션이 없어.');const result=apply(c.profile.data,item);c.bag.items[id]=count-1;c.bag.logs.unshift({type:'사용',item:item.name,quantity:1,at:new Date().toISOString()});c.bag.logs=c.bag.logs.slice(0,100);c.profile.updatedAt=new Date().toISOString();save(c.store);return{item,result}}
-function useOutsideBattle(owner,id){const item=catalog[id];if(!item)throw Error('이 소모품은 전용 사용 화면에서 사용해 줘. 소모하지 않았어.');if(!['heal','healPercent','fullHeal'].includes(item.kind))throw Error('해독·전투 강화 물약은 몬스터 전투장에서 사용해 줘. 소모하지 않았어.');return consume(owner,id,(data,potion)=>{const max=Number(data.hpMax),raw=data.hpCurrent,hp=raw==null||raw===''?max:Number(raw);if(!Number.isSafeInteger(max)||max<=0||!Number.isSafeInteger(hp)||hp<0||hp>max)throw Error('현황표의 현재 HP와 최대 HP를 확인해 줘.');if(hp===0)throw Error('HP가 0인 캐릭터는 회복 물약으로 부활할 수 없어.');if(hp===max)throw Error('HP가 이미 가득 차 있어. 물약은 소모하지 않았어.');const heal=potion.kind==='fullHeal'?max:potion.kind==='healPercent'?Math.max(1,Math.floor(max*(potion.value/100))):potion.value,next=hp+Math.min(max-hp,heal);if(!Number.isSafeInteger(next)||next<=hp)throw Error('회복량을 확인해 줘. 물약은 소모하지 않았어.');data.hpCurrent=String(next);return{before:hp,after:next,max,healed:next-hp}})}
-globalThis.RpgPotionInventory=Object.freeze({catalog,context,bagFor,save,consume,useOutsideBattle,repairChests});
+function consume(owner, id, apply) {
+  const c = context(owner);
+  const item = ownedItems(c.profile).find(item => item.id === id);
+  if (!item) throw Error('보유한 소모품이 없어. 목록을 새로고침해 줘.');
+  if (item.kind === 'unsupported') throw Error(item.effect);
+  const result = apply(c.profile.data, item);
+  if (item.line != null) {
+    const lines = String(c.profile.data.consumables || '').split('\n');
+    if (item.quantity > 1) lines[item.index] = item.name + ' ×' + (item.quantity - 1);
+    else lines.splice(item.index, 1);
+    c.profile.data.consumables = lines.join('\n');
+  } else c.bag.items[id] = item.quantity - 1;
+  c.bag.logs.unshift({type:'사용', item:item.name, quantity:1, at:new Date().toISOString()});
+  c.bag.logs = c.bag.logs.slice(0,100);
+  c.profile.updatedAt = new Date().toISOString();
+  save(c.store);
+  return {item, result};
+}
+function useOutsideBattle(owner,id){const item=ownedItems(context(owner).profile).find(x=>x.id===id);if(item?.kind==='return')return consume(owner,id,data=>{if(Number(data.hpCurrent??data.hpMax)<=0)throw Error('전투 불능 상태에서는 귀환서를 사용할 수 없어.');return returnToTown(data)});if(!item)throw Error('이 소모품은 전용 사용 화면에서 사용해 줘. 소모하지 않았어.');if(!['heal','healPercent','fullHeal'].includes(item.kind))throw Error('해독·전투 강화 물약은 몬스터 전투장에서 사용해 줘. 소모하지 않았어.');return consume(owner,id,(data,potion)=>{const max=Number(data.hpMax),raw=data.hpCurrent,hp=raw==null||raw===''?max:Number(raw);if(!Number.isSafeInteger(max)||max<=0||!Number.isSafeInteger(hp)||hp<0||hp>max)throw Error('현황표의 현재 HP와 최대 HP를 확인해 줘.');if(hp===0)throw Error('HP가 0인 캐릭터는 회복 물약으로 부활할 수 없어.');if(hp===max)throw Error('HP가 이미 가득 차 있어. 물약은 소모하지 않았어.');const heal=potion.kind==='fullHeal'?max:potion.kind==='healPercent'?Math.max(1,Math.floor(max*(potion.value/100))):potion.value,next=hp+Math.min(max-hp,heal);if(!Number.isSafeInteger(next)||next<=hp)throw Error('회복량을 확인해 줘. 물약은 소모하지 않았어.');data.hpCurrent=String(next);return{before:hp,after:next,max,healed:next-hp}})}
+globalThis.RpgPotionInventory=Object.freeze({catalog,context,bagFor,ownedItems,returnToTown,save,consume,useOutsideBattle,repairChests});
 globalThis.addEventListener?.('our-rpg:profiles-updated',repairChests);globalThis.addEventListener?.('storage',e=>{if(e.key===KEY)repairChests()});repairChests();
 })();

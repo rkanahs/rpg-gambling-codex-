@@ -501,7 +501,12 @@
     const resultTotal = number(move.currentCoordinate);
     const moved = number(move.distance != null ? move.distance : move.moved);
     data.distance = Number.isFinite(Number(move.currentCoordinate)) ? resultTotal : (previous + moved);
+    const previousRegion = data.region;
     data.region = statusRegion(move.region);
+    if (!data.lastSafeTown || previousRegion !== data.region) {
+      const base = data.region.startsWith('경계') ? 15000 : data.region.startsWith('대륙') ? 5000 : 0;
+      data.lastSafeTown = {name: data.region.split(' · ')[1], region: data.region, distance: base};
+    }
     data.expNeeded = String(regionLevelExp(data.region));
     data.lastMovement = [move.at || new Date().toISOString(), "+" + moved, move.encounter || "결과 미기록"].join(" · ");
     move.characterId = profile.id;
@@ -510,6 +515,7 @@
     globalThis.RpgPetMovement?.apply(profile, move);
     discoverVillage(store, profile, move);
     if (data.subVillageExploration) data.subVillageExploration.currentVisit = move.subVillage?.success ? {name: move.subVillage.name, movementId: move.id, at: move.at} : null;
+    if (move.subVillage?.success) data.lastSafeTown = {name: move.subVillage.name, region: data.region, distance: resultTotal};
     if (move.subVillage?.success) data.lastMovement += " · 서브 마을 발견 · " + move.subVillage.name;
     profile.updatedAt = new Date().toISOString();
     write(PROFILE_KEY, store);
