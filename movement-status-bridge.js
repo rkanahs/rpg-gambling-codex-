@@ -183,10 +183,11 @@
     const speed = Number(profile?.data?.speed);
     doc.movementSpeed = Number.isFinite(speed) && speed >= 0 ? speed : 0;
     const speedNotice = doc.getElementById("movementSpeedNotice");
-    const inputMax = doc.movementSpeed >= 500 ? 300 : 100;
+    const inputMax = 100;
+    const diceCount = doc.movementDiceCount?.(doc.movementSpeed) || 1;
     const moveInput = doc.getElementById("move");
     if (moveInput) { moveInput.max = String(inputMax); moveInput.placeholder = "1~" + inputMax; }
-    if (speedNotice) speedNotice.textContent = "현황표 이속 " + doc.movementSpeed.toLocaleString("ko-KR") + " · 이동 D100 결과 1~" + inputMax + " 입력 · 추가 이속 주사위 자동 합산 없음 (펫 추가 이동은 별도)";
+    if (speedNotice) speedNotice.textContent = "현황표 이속 " + doc.movementSpeed.toLocaleString("ko-KR") + " · 이동 D100 " + diceCount + "개 · 첫 결과 1~100 입력, 나머지 자동 굴림 (펫 주사위 별도)";
     if (!profile || !profile.data) {
       notice(doc, "현황표에 저장된 캐릭터가 없어. 먼저 플레이어 현황표에서 캐릭터를 저장해 줘.", false);
       return null;
