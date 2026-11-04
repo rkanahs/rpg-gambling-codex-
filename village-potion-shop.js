@@ -118,6 +118,71 @@
   }
 
   const ALL_ITEMS = itemMap();
+  const POTION_KINDS = new Set(["heal", "healPercent", "fullHeal", "poison", "cleanse", "buff"]);
+  const saleGuards = new WeakMap();
+
+  function saleQuote(id, quantity = 1) {
+    const item = ALL_ITEMS[id];
+    const potion = globalThis.RpgPotionInventory?.catalog[id];
+    if (!item || !Number.isSafeInteger(item[3]) || item[3] <= 0 || !POTION_KINDS.has(potion?.kind)) {
+      throw Error("이 소모품은 상점 물약 판매 대상이 아니야.");
+    }
+    if (!Number.isSafeInteger(quantity) || quantity < 1) throw Error("판매 수량은 1개 이상의 정수로 입력해 줘.");
+    const unitCopper = Math.floor(item[3] / 2), totalCopper = unitCopper * quantity;
+    if (!Number.isSafeInteger(totalCopper)) throw Error("판매 수량이 너무 많아.");
+    return { id, name: item[2], quantity, unitCopper, totalCopper };
+  }
+
+  function saleState(bag) {
+    const state = bag.shopSaleState;
+    if (state == null) return { sequence: 0, last: null };
+    if (!Number.isSafeInteger(state.sequence) || state.sequence < 1 || !state.last || state.last.sequence !== state.sequence) {
+      throw Error("물약 판매 기록을 확인해 줘.");
+    }
+    return state;
+  }
+
+  function sellPotion(owner, id, quantity, requestId, expectedSequence) {
+    if (globalThis.RpgCloudSyncState?.isBusy?.()) throw Error("기기 연동 중이야. 완료 후 다시 판매해 줘.");
+    const api = globalThis.RpgPotionInventory;
+    if (!api?.context) throw Error("소모품 인벤토리를 불러오지 못했어. 새로고침해 줘.");
+    const c = api.context(owner);
+    if (!owner || c.store.activeId !== owner) throw Error("판매할 캐릭터를 현황표에서 다시 선택해 줘.");
+    const quote = saleQuote(id, quantity), state = saleState(c.bag);
+    if (!/^[a-zA-Z0-9_-]{16,100}$/.test(requestId || "") || !Number.isSafeInteger(expectedSequence)) throw Error("판매 요청을 다시 확인해 줘.");
+    if (state.last?.requestId === requestId) {
+      if (state.last.id !== id || state.last.quantity !== quantity || state.last.sequence !== expectedSequence + 1) throw Error("이미 처리한 판매 요청과 내용이 달라.");
+      return { ...state.last, duplicate: true };
+    }
+    if (state.sequence !== expectedSequence) throw Error("다른 판매가 이미 처리됐어. 갱신된 목록에서 다시 선택해 줘.");
+    const count = Number(c.bag.items[id] || 0);
+    if (!Number.isSafeInteger(count) || count < quantity) throw Error("보유한 물약 수량보다 많이 팔 수 없어.");
+    const units = [["diamond", 1000000], ["gold", 10000], ["silver", 100], ["copper", 1]];
+    let before = 0;
+    for (const [key, rate] of units) {
+      const value = Number(c.profile.data[key] || 0);
+      if (!Number.isSafeInteger(value) || value < 0) throw Error("현황표의 보유 금액을 확인해 줘.");
+      before += value * rate;
+    }
+    const after = before + quote.totalCopper;
+    if (!Number.isSafeInteger(before) || !Number.isSafeInteger(after)) throw Error("보유 금액이 저장 범위를 초과했어.");
+    let remaining = after;
+    for (const [key, rate] of units) { c.profile.data[key] = String(Math.floor(remaining / rate)); remaining %= rate; }
+    c.bag.items[id] = count - quantity;
+    const at = new Date().toISOString();
+    const receipt = { ...quote, requestId, sequence: state.sequence + 1, profileId: owner, before, after, remaining: count - quantity, at };
+    c.bag.shopSaleState = { sequence: receipt.sequence, last: receipt };
+    c.bag.logs.unshift({ type: "판매", item: quote.name, quantity, unitCopper: quote.unitCopper, totalCopper: quote.totalCopper, sourceId: requestId, at });
+    c.bag.logs = c.bag.logs.slice(0, 100);
+    c.profile.updatedAt = at;
+    // Money, inventory and the permanent sequence guard share one atomic profile write.
+    try { api.save(c.store); } catch (_) { throw Error("저장하지 못해 판매를 취소했어. 물약과 돈은 바뀌지 않았어."); }
+    return { ...receipt, duplicate: false };
+  }
+
+  function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])); }
+  function formatMoney(value) { return globalThis.OurRpgWallet?.format(value) || value.toLocaleString("ko-KR") + "구리"; }
+  function saleRequestId() { return "POTION-SALE-" + Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join(""); }
 
   function saveInventory(all) {
     window.RpgPotionInventory.save(all);
@@ -134,6 +199,7 @@
       .vs-group{margin-top:14px}.vs-group h5{display:flex;justify-content:space-between;gap:8px;margin:0 0 8px;color:#dce7e1;font-size:14px}.vs-group h5 span{color:#8fc7aa;font-size:12px}
       .vs-shop{display:grid;grid-template-columns:1fr 1fr;gap:8px}.vs-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center;border:1px solid #2e463c;background:#13211c;padding:10px}.vs-item>i{font-style:normal;font-size:25px}.vs-item b,.vs-item small,.vs-item strong{display:block}.vs-item small{color:#9eb0a8;line-height:1.45}.vs-item strong{color:#7dd5a5}.vs-stock{color:#f0cf7c!important;font-weight:800}.vs-buy{display:grid;gap:5px}.vs-buy label{font-size:11px;color:#9eb0a8}.vs-buy select{min-height:34px;background:#0c1512;color:#fff;border:1px solid #3d5a4e}.vs-buy button,.vs-slot button{min-height:38px;border:1px solid #80682f;background:#2d2518;color:#f6dfa5;font-weight:850;padding:5px 10px}.vs-owned{margin-top:9px}.vs-slot{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border-bottom:1px solid #273a32;padding:8px 0}.vs-slot small{display:block;color:#9eb0a8}.vs-slot em{font-style:normal;color:#7dd5a5;font-weight:900}.vs-empty{color:#82928a;padding:9px 0}.vs-msg{min-height:24px;color:#7dd5a5;font-weight:800;margin:10px 0 0}.vs-history{margin:8px 0 0;padding-left:20px;color:#b8c8c0;font-size:12px}.vs-history time{color:#83968d}
       @media(max-width:760px){.vs-shop,.vs-summary{grid-template-columns:1fr}.vs-head{flex-direction:column}.vs-badge{white-space:normal}.vs-item{grid-template-columns:auto minmax(0,1fr)}.vs-buy{grid-column:2;grid-template-columns:1fr 80px;align-items:end}.vs-slot{grid-template-columns:minmax(0,1fr) auto}.vs-slot button{grid-column:1/-1;width:100%}}
+      .vs-slot{grid-template-columns:minmax(0,1fr) auto}.vs-owned-actions{grid-column:1/-1;display:grid;grid-template-columns:80px minmax(0,1fr);gap:8px}.vs-sell{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,110px);gap:8px;align-items:end}.vs-sell label{font-size:12px;color:#b8c8c0}.vs-sell input{display:block;width:100%;min-width:0;min-height:40px;margin-top:3px;padding:7px;border:1px solid #496455;background:#0c1512;color:#fff}.vs-slot .vs-owned-actions button{grid-column:auto;min-height:44px;cursor:pointer}.vs-slot .vs-owned-actions>button{align-self:end}.vs-owned-actions button:disabled{opacity:.5;cursor:not-allowed}.vs-sale-price{color:#efce85!important;margin-top:3px}
     `;
     doc.head.appendChild(style);
   }
@@ -171,7 +237,7 @@
       <div class="vs-head"><div><b>🧪 ${current.town} 물약 상점</b><small>${current.note} · 구매 즉시 돈 차감·인벤토리 저장</small></div><span class="vs-badge">물약상 ${current.npc}</span></div>
       <div class="vs-rule"><strong>현재 지역: ${current.region}</strong><br>현황표의 현재 지역에 맞는 상점으로 자동 전환돼. 현재 지역의 상품만 구매할 수 있어. 한국 시간 매일 00:00에 상품별 재고가 99개로 다시 채워져.</div>
       <div class="vs-summary"><div><small>현재 캐릭터</small><b>${profile?.data?.characterName || "저장 필요"}</b></div><div><small>보유 금액</small><b id="vsFunds">${window.OurRpgWallet?.format(moneyTotal(profile)) || moneyTotal(profile) + "구리"}</b></div></div>
-      ${groups}<h4>내 소모품</h4><div class="vs-owned" id="villageOwned"></div><h4>최근 구매·사용</h4><ol class="vs-history" id="villageHistory"></ol><p class="vs-msg" id="invMsg" role="status" aria-live="polite"></p>`;
+      ${groups}<h4>내 소모품 · 물약 판매</h4><p class="vs-rule">보유한 상점 물약은 수량을 골라 상점 구매가의 <strong>50%</strong>에 팔 수 있어. 판매할 물약 수량과 받을 돈을 확인한 뒤 판매해 줘.</p><div class="vs-owned" id="villageOwned"></div><h4>최근 구매·사용·판매</h4><ol class="vs-history" id="villageHistory"></ol><p class="vs-msg" id="invMsg" role="status" aria-live="polite"></p>`;
 
     function message(text, bad) {
       const box = panel.querySelector("#invMsg");
@@ -183,22 +249,56 @@
       const active = activeProfile();
       if (!active) { box.innerHTML = '<p class="vs-empty">저장된 캐릭터가 없어.</p>'; return; }
       const bag = inventory(active).bag;
+      const sequence = saleState(bag).sequence;
       const owned = Object.entries(bag.items || {}).filter(([, count]) => Number(count) > 0);
       box.innerHTML = owned.length ? owned.map(([id, count]) => {
         const item = ALL_ITEMS[id] || [id, "📦", id, 0, "효과는 운영자에게 확인", ""];
-        return `<div class="vs-slot"><div><b>${item[1]} ${item[2]}</b><small>${item[4]}</small></div><em>${Number(count)}개</em><button type="button" data-vs-use="${id}">사용</button></div>`;
+        let quote; try { quote = saleQuote(id); } catch (_) {}
+        const itemId = escapeHtml(id), itemName = escapeHtml(item[2]);
+        const sell = quote ? `<div class="vs-sell"><label>판매 수량<input type="number" min="1" max="${Number(count)}" step="1" value="1" inputmode="numeric" aria-label="${itemName} 판매 수량"></label><button type="button" data-vs-sell="${itemId}" data-sale-sequence="${sequence}" aria-label="${itemName} 반값 판매">반값 판매</button></div>` : "";
+        return `<div class="vs-slot"><div><b>${escapeHtml(item[1])} ${itemName}</b><small>${escapeHtml(item[4])}</small>${quote ? `<small class="vs-sale-price">판매가 · 1개 ${formatMoney(quote.unitCopper)} (50%)</small>` : ""}</div><em>${Number(count)}개</em><div class="vs-owned-actions"><button type="button" data-vs-use="${itemId}">사용</button>${sell}</div></div>`;
       }).join("") : '<p class="vs-empty">보유한 소모품이 없어.</p>';
       const history = panel.querySelector("#villageHistory");
-      history.innerHTML = (bag.logs || []).slice(0, 5).map(log => `<li><b>${log.type}</b> · ${log.item}${log.quantity ? ` ×${log.quantity}` : ""} <time>${new Date(log.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</time></li>`).join("") || "<li>아직 기록이 없어.</li>";
+      history.innerHTML = (bag.logs || []).slice(0, 5).map(log => `<li><b>${escapeHtml(log.type)}</b> · ${escapeHtml(log.item)}${log.quantity ? ` ×${Number(log.quantity)}` : ""}${log.type === "판매" && Number.isSafeInteger(log.totalCopper) ? ` · +${formatMoney(log.totalCopper)}` : ""} <time>${new Date(log.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</time></li>`).join("") || "<li>아직 기록이 없어.</li>";
       const funds = panel.querySelector("#vsFunds");
       if (funds) funds.textContent = window.OurRpgWallet?.format(moneyTotal(active)) || moneyTotal(active) + "구리";
     }
 
-    panel.onclick = event => {
+    panel.onclick = async event => {
       const buy = event.target.closest("[data-vs-buy]");
       const use = event.target.closest("[data-vs-use]");
+      const sell = event.target.closest("[data-vs-sell]");
       const active = activeProfile();
       if (!active) return message("먼저 캐릭터 현황표를 저장해 줘.", true);
+      if (sell) {
+        let guard = saleGuards.get(doc);
+        if (!guard) { guard = { busy: false, until: 0 }; saleGuards.set(doc, guard); }
+        if (guard.busy || Date.now() < guard.until) return;
+        guard.busy = true;
+        try {
+          if (active.id !== profile?.id) throw Error("선택한 캐릭터가 바뀌었어. 목록을 다시 확인해 줘.");
+          const id = sell.dataset.vsSell, quantity = Number(sell.parentElement.querySelector("input").value);
+          const quote = saleQuote(id, quantity), expectedSequence = Number(sell.dataset.saleSequence);
+          if (quantity > Number(inventory(active).bag.items[id] || 0)) throw Error("보유한 물약 수량보다 많이 팔 수 없어.");
+          if (!confirm(`${quote.name} ${quantity}개를 판매할까?\n받는 금액: ${formatMoney(quote.totalCopper)} (상점 구매가의 50%)`)) return;
+          sell.disabled = true;
+          const requestId = saleRequestId(), commit = () => sellPotion(active.id, id, quantity, requestId, expectedSequence);
+          const result = navigator.locks ? await navigator.locks.request("our-rpg-village-potion-sale", commit) : commit();
+          render(doc);
+          const box = doc.getElementById("invMsg");
+          if (box) box.textContent = `✓ ${result.name} ${result.quantity}개 판매 · ${formatMoney(result.totalCopper)} 지급 · 남은 ${result.remaining}개`;
+        } catch (error) {
+          render(doc);
+          const box = doc.getElementById("invMsg");
+          if (box) { box.textContent = `판매하지 못했어 · ${error.message || "저장 오류"}`; box.style.color = "#ff8b8b"; }
+        } finally {
+          guard.busy = false; guard.until = Date.now() + 700;
+          const buttons = [...(doc.getElementById("rpgInventory")?.querySelectorAll("[data-vs-sell]") || [])];
+          buttons.forEach(button => { button.disabled = true; });
+          setTimeout(() => buttons.forEach(button => { if (button.isConnected) button.disabled = false; }), 700);
+        }
+        return;
+      }
       if (buy) {
         if (active.id !== profile?.id || townIndex(active.data?.region) !== index || !current.items.some(item => item[0] === buy.dataset.vsBuy)) {
           render(doc);
@@ -280,5 +380,7 @@
     setTimeout(run, 80);
   }
 
+  globalThis.RpgVillagePotionShop = Object.freeze({ saleQuote, sellPotion });
+  if (typeof document === "undefined") return;
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", install, { once: true }) : install();
 })();
