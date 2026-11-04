@@ -180,7 +180,7 @@
     loadPet(doc, profile);
     installTower(doc, profile);
     renderTower(doc, profile);
-    const speed = Number(profile?.data?.speed);
+    const speed = Number(globalThis.RpgEquipmentCore?.calculate(profile?.data||{}).total.speed ?? profile?.data?.speed);
     doc.movementSpeed = Number.isFinite(speed) && speed >= 0 ? speed : 0;
     const speedNotice = doc.getElementById("movementSpeedNotice");
     const inputMax = 1000;
