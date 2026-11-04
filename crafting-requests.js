@@ -53,8 +53,8 @@
       if(!alive()||ctx.busy||ctx.reading)return;
       const id=identity();
       if(id!==ctx.identity){ctx.identity=id;ctx.records=[];ctx.signature='';ctx.draft=null;$('[data-craft-list]').replaceChildren();}
-      if(ctx.owner!==current()?.id){message('캐릭터가 변경되었습니다. 제작 공방을 다시 열어 주세요.');paint();return;}
       if(!ctx.owner||!session(PLAYER)){message('기기간 연동을 연결하고 현황표에서 제작자 캐릭터를 선택해 주세요.');paint();return;}
+      if(ctx.owner!==current()?.id){message('캐릭터가 변경되었습니다. 제작 공방을 다시 열어 주세요.');paint();return;}
       ctx.reading=true;const epoch=ctx.epoch;
       try{const out=await api(false,ctx.owner);if(!alive()||id!==identity()||epoch!==ctx.epoch)return;ctx.records=out.records;render();message('제작 신청 '+out.records.length+'건 · 5초마다 자동 갱신');}
       catch(e){if(alive()&&id===identity())message(e.message+' 기존 신청은 유지됩니다.');}
