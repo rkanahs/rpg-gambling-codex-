@@ -74,3 +74,35 @@
   function boot(){const frame=document.getElementById('embeddedFrame'),run=()=>{try{install(frame.contentDocument)}catch(_){}};if(frame){frame.addEventListener('load',()=>setTimeout(run,40));setTimeout(run,40)}}
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',boot,{once:true}):boot();
 })();
+
+
+// Agreed covenant guidance in the original RPG status sheet.
+(()=>{
+  'use strict';
+  function show(){
+    const d=document.getElementById('embeddedFrame')?.contentDocument;
+    const dashboard=d?.getElementById('statusDashboard');
+    if(!dashboard||d.getElementById('godCovenantNotice'))return;
+    const box=d.createElement('section');
+    box.id='godCovenantNotice';
+    box.setAttribute('aria-labelledby','godCovenantTitle');
+    box.style.cssText='border:1px solid #80682f;background:#101d17;padding:16px;margin:14px 0;overflow-wrap:anywhere';
+    const title=d.createElement('h2');
+    title.id='godCovenantTitle';
+    title.textContent='신과의 계약';
+    title.style.cssText='margin:0 0 8px;color:#f0cf7c;font-size:20px';
+    const text=d.createElement('p');
+    text.style.cssText='margin:0;line-height:1.8;color:#e8f0ec';
+    text.textContent='경계에 처음 들어가면 신을 한 번만 선택한다. 전 용사가 만난 신은 전투의 신으로 밝혀진다. 아무 신도 고르지 않으면 도박신과 즉시 계약한다. 도박신 계약은 서버에서 한 계정만 가능하며 새 캐릭터에도 자동 적용된다. 모든 것을 걸어 도박할 수 있고 강화는 상한 없이 누적되지만, 사망하면 누적 강화만 사라지고 계약은 유지된다.';
+    box.append(title,text);
+    dashboard.after(box);
+  }
+  function boot(){
+    const frame=document.getElementById('embeddedFrame');
+    if(!frame)return;
+    frame.addEventListener('load',show);
+    show();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
+})();
