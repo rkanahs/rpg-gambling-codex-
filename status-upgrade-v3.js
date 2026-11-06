@@ -106,3 +106,13 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 })();
+
+// Load the working covenant system into the original RPG, using its existing account service.
+(()=>{
+  if(document.getElementById('rpgCovenantRuntime'))return;
+  const base='https://rpg-market-casino.spicy-wren-9157.chatgpt.site';
+  const stats=document.createElement('script');stats.id='rpgCovenantRuntime';stats.src=base+'/covenant-stats.js?v=20261106-contracts-1';
+  stats.onload=()=>{const app=document.createElement('script');app.src=base+'/god-covenant.js?v=20261106-contracts-1';document.head.append(app)};
+  stats.onerror=()=>{const d=document.getElementById('embeddedFrame')?.contentDocument,box=d?.getElementById('godCovenantNotice');if(box){const p=d.createElement('p');p.textContent='계약 기능을 불러오지 못했어. 인터넷 연결을 확인하고 다시 불러와 줘.';box.append(p)}};
+  document.head.append(stats);
+})();
