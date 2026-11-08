@@ -11,7 +11,17 @@ export class CloudSyncEngine{
  async connect(code){const data=await this.call('/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})},null);if(!/^[a-f0-9]{64}$/.test(data.token))throw Error('연결 응답이 올바르지 않아.');this.keep({version:1,...data,enabled:false,revision:0,hash:null});return this.remote()}
  async backups(){let local=[];try{local=JSON.parse(this.storage.getItem(BACKUP_KEY)||'[]')}catch{}let durable=[];try{durable=await this.backupVault.load()}catch{}const seen=new Set();return [...(Array.isArray(local)?local:[]),...(Array.isArray(durable)?durable:[])].filter(x=>{if(!x?.snapshot||!x.at)return false;const key=x.at+'|'+x.label;if(seen.has(key))return false;seen.add(key);return true}).sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0)).slice(0,3)}
  async latestBackup(){return(await this.backups())[0]||null}
- async backup(snapshot,label){const old=await this.backups(),list=[{at:new Date().toISOString(),label,snapshot:validateSnapshot(snapshot)},...old].slice(0,3);try{this.storage.setItem(BACKUP_KEY,JSON.stringify(list));return}catch{}try{await this.backupVault.save(list)}catch{throw Error('기기 백업을 저장하지 못했어. 기존 진행 기록은 그대로야. 백업을 내려받은 뒤 기기 저장 공간을 확보해 줘.')}try{this.storage.removeItem(BACKUP_KEY)}catch{} }
+ async backup(snapshot,label){
+  const old=await this.backups();
+  const list=[{at:new Date().toISOString(),label,snapshot:validateSnapshot(snapshot)},...old].slice(0,3);
+  const before=this.storage.getItem(BACKUP_KEY);
+  try{await this.backupVault.save(list)}
+  catch{
+   try{this.storage.setItem(BACKUP_KEY,JSON.stringify(list));return}
+   catch{throw Error('기기 백업을 저장하지 못했어. 기존 진행 기록은 그대로야.')}
+  }
+  if(this.storage.getItem(BACKUP_KEY)===before)this.storage.removeItem(BACKUP_KEY);
+ }
 
  async adopt(remote){const session=this.session();this.keep({...session,revision:remote.revision,hash:await snapshotHash(remote.snapshot),enabled:true,updatedAt:remote.updatedAt})}
  async upload(remote){const snapshot=this.local(),session=this.session();await this.backup(snapshot,'서버 저장 전 기기 기록');const hash=await snapshotHash(snapshot);if(this.session()?.token!==session?.token)throw Error('연결 계정이 바뀌었어. 진행 기록을 다시 확인해 줘.');const saved=await this.call('',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({snapshot,revision:remote.revision})});if(this.session()?.token!==session.token)throw Error('연결 계정이 바뀌었어. 진행 기록을 다시 확인해 줘.');this.keep({...session,enabled:true,revision:saved.revision,hash,updatedAt:saved.updatedAt});return saved}

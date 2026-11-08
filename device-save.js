@@ -1,4 +1,4 @@
-import {DeviceSaves,SLOT_COUNT} from './device-save-core.mjs?v=20261108-slots20';
+import {DeviceSaves,SLOT_COUNT} from './device-save-core.mjs?v=20261108-backup-space';
 import {snapshotSummary} from './cloud-sync-protocol.mjs';
 const saves=new DeviceSaves(localStorage),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let imported=null,focusBefore,overflow='',page=0,busy=false;
 const perPage=5;
@@ -17,3 +17,6 @@ button.onclick=()=>{focusBefore=document.activeElement;overflow=document.body.st
 modal.querySelector('#closeDeviceSave').onclick=close;modal.addEventListener('click',e=>{if(e.target===modal)close()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden){e.preventDefault();e.stopImmediatePropagation();close()}if(e.key==='Tab'&&!modal.hidden){const list=[...modal.querySelectorAll('button:not(:disabled),input')].filter(x=>!x.hidden);const first=list[0],last=list.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}},true);
 modal.querySelector('#downloadDeviceCurrent').onclick=()=>attempt(()=>download({format:'our-rpg-device-save',version:1,savedAt:new Date().toISOString(),snapshot:saves.current()},'our-rpg-device-current-'+Date.now()));modal.querySelector('#downloadDeviceSafety').onclick=()=>attempt(async()=>{const record=await saves.safety();if(!record)throw Error('아직 불러오기 전 안전 백업이 없어.');download(record,'our-rpg-device-safety-'+Date.now())});
 modal.querySelector('#deviceSaveFile').onchange=async e=>{const host=modal.querySelector('#deviceImportPreview');host.replaceChildren();imported=null;try{const file=e.target.files?.[0];if(!file)return;if(file.size>2000000)throw Error('저장 파일은 2MB 이하만 불러올 수 있어.');imported=saves.parse(await file.text());host.innerHTML='<article class="device-save-slot"><h3>불러올 파일 미리보기</h3>'+summary(imported)+'<button id="applyDeviceFile">이 파일 기록 불러오기</button></article>';host.querySelector('#applyDeviceFile').onclick=()=>attempt(()=>restore(imported));say('파일을 확인했어. 캐릭터와 저장 시각을 확인하고 불러와 줘.')}catch(error){say(error.message)}};
+
+// Free space occupied by legacy backups as soon as the game loads.
+saves.ready().catch(()=>{});

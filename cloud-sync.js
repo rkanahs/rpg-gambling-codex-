@@ -1,4 +1,4 @@
-import {CloudSyncEngine,SESSION_KEY,BACKUP_KEY} from './cloud-sync-engine.mjs?v=20261103-backup-quota';
+import {CloudSyncEngine,SESSION_KEY,BACKUP_KEY} from './cloud-sync-engine.mjs?v=20261108-backup-space';
 import {isProgressKey,snapshotSummary} from './cloud-sync-protocol.mjs?v=20261103-restore';
 const SERVICE='https://rpg-market-casino.spicy-wren-9157.chatgpt.site',API=SERVICE+'/api/rpg-sync',engine=new CloudSyncEngine(localStorage,(path,options)=>fetch(API+path,{...options,signal:AbortSignal.timeout(15000)}));let busy=false,review=null,status='기기에 저장 중 · 연동 안 됨',timer,urgentDiscovery=false,previousOverflow='';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -1,4 +1,4 @@
-import {DeviceSlotVault} from './device-slot-vault.mjs';
+import {DeviceSlotVault} from './device-slot-vault.mjs?v=20261108-backup-space';
 import {collectSnapshot,validateSnapshot,isProgressKey,PROFILE_KEY} from './cloud-sync-protocol.mjs';
 export const SAVES_KEY='RPG_DEVICE_MANUAL_SAVES_V1',SAFETY_KEY='RPG_DEVICE_RESTORE_SAFETY_V1',SESSION_KEY='RPG_CLOUD_DEVICE_SESSION_V1';
 export const SLOT_COUNT=20;
@@ -10,6 +10,10 @@ export class DeviceSaves{
  }
  async migrate(){
   const old=this.storage.getItem(SAVES_KEY),safety=this.storage.getItem(SAFETY_KEY);
+  const automaticKey='RPG_CLOUD_LOCAL_BACKUPS_V1';
+  const automaticRaw=this.storage.getItem(automaticKey);
+  let automatic;
+  try{const parsed=JSON.parse(automaticRaw);if(Array.isArray(parsed))automatic=parsed}catch{}
   const entries=[];
   if(old!==null){
    let list;
@@ -18,7 +22,8 @@ export class DeviceSaves{
    list.forEach((record,i)=>{if(record)entries.push(['manual-slot:'+i,record])});
   }
   if(safety!==null)entries.push(['manual-safety',this.parse(safety)]);
-  if(entries.length)await this.vault.migrate(entries);
+  if(entries.length||automatic?.length)await this.vault.migrate(entries,automatic);
+  if(automatic&&this.storage.getItem(automaticKey)===automaticRaw)this.storage.removeItem(automaticKey);
   if(old!==null&&this.storage.getItem(SAVES_KEY)===old)this.storage.removeItem(SAVES_KEY);
   if(safety!==null&&this.storage.getItem(SAFETY_KEY)===safety)this.storage.removeItem(SAFETY_KEY);
  }

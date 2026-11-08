@@ -23,8 +23,22 @@ export class DeviceSlotVault extends DeviceBackupVault {
  put(key,record){
   return this.transaction('readwrite',store=>store.put(record,key));
  }
- migrate(entries){
+ migrate(entries,automatic){
   return this.transaction('readwrite',store=>{
+   if(automatic?.length){
+    const request=store.get('recent');
+    request.onsuccess=()=>{
+     const old=Array.isArray(request.result)?request.result:[];
+     const seen=new Set();
+     const merged=[...automatic,...old].filter(record=>{
+      const key=JSON.stringify(record);
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+     });
+     store.put(merged,'recent');
+    };
+   }
    for(const [key,record] of entries){
     const request=store.get(key);
     request.onsuccess=()=>{if(request.result===undefined)store.put(record,key)};
