@@ -31,17 +31,1274 @@ globalThis.RpgSkillLearning=Object.freeze({current,canUse,allowedJobs,learnedIds
  addHiddenSkills();
 })();
 
+// Install rules in the existing monster arena, where its battle state lives.
 (()=>{
- const frame=document.getElementById('embeddedFrame');
- function connect(){setTimeout(()=>{
-  const doc=frame?.contentDocument;
-  if(!doc?.querySelector('#combatSkill'))return;
-  const script=doc.createElement('script');
-  script.dataset.cooldowns="{\"천마 양단\":2,\"두 문의 권능\":4,\"양면 결계\":5,\"경계의 존재\":0,\"천지마계 붕괴\":8,\"망자 소환\":4,\"영혼 수확\":2,\"뼈 감옥\":4,\"불사의 계약\":1,\"망자 군단\":8,\"세계수의 숨결\":3,\"대지의 속박\":3,\"태고의 수호수\":5,\"자연의 순환\":0,\"세계수의 심판\":4,\"시간 지연\":3,\"가속된 순간\":4,\"되감기\":6,\"시간 파편\":1,\"정지한 세계\":8,\"심연의 손\":2,\"표식 폭발\":3,\"심연 봉인\":5,\"깊은 흔적\":0,\"심연핵 붕괴\":7,\"전쟁의 선율\":3,\"수호의 선율\":3,\"질주의 선율\":3,\"생명의 선율\":3,\"세계의 교향곡\":8,\"공간 도약\":3,\"위치 교환\":4,\"공간 고정\":4,\"접힌 거리\":1,\"무한 격리\":7,\"용혈 참격\":2,\"용린 강화\":4,\"혈맥 폭발\":5,\"용의 피\":0,\"용왕의 숨결\":7,\"전사의 성좌\":3,\"수호의 성좌\":3,\"현자의 성좌\":3,\"길잡이 별\":0,\"성좌 낙하\":7,\"낮은 쪽의 힘\":3,\"높은 쪽의 억제\":4,\"균형 회복\":5,\"천칭의 눈\":0,\"완전한 평형\":8,\"실패 완화\":1,\"운명의 재굴림\":4,\"결과 분산\":5,\"극값의 기억\":1,\"운명의 설계\":8}";
-  script.textContent="(function installHiddenCombatBuffs(){\n const select=document.querySelector('#combatSkill'),button=document.querySelector('#useCombatSkill');\n if(!select||!button||typeof petEffective!=='function'||select.dataset.hiddenBuffs)return;\n select.dataset.hiddenBuffs='1';\n const skills=[\n  ['용혈전사',3,'혈맥 폭발','blood',{atk:25,spd:25}],\n  ['별의 관측자',1,'전사의 성좌','star',{atk:25}],\n  ['별의 관측자',2,'수호의 성좌','star',{def:30}],\n  ['별의 관측자',3,'현자의 성좌','star',{mag:25}],\n ];\n const songs=[\n  ['음율사',1,'전쟁의 선율','warSong',{atk:20,mag:20}],\n  ['음율사',2,'수호의 선율','guardSong',{def:25}],\n  ['음율사',3,'질주의 선율','speedSong',{spd:25}],\n  ['음율사',4,'생명의 선율','lifeSong',{}],\n  ['음율사',5,'세계의 교향곡','symphony',{atk:20,def:20,mag:20,spd:20}],\n ];\n skills.push(...songs);\n skills.push(\n  ['심연술사',1,'심연의 손','abyssHand',{}],\n  ['심연술사',2,'표식 폭발','abyssBurst',{}],\n  ['심연술사',3,'심연 봉인','abyssSeal',{}],\n  ['심연술사',5,'심연핵 붕괴','abyssCollapse',{}],\n );\n skills.push(['드루이드',1,'세계수의 숨결','worldTreeBreath',{}]);\n const book=globalThis.parent.RpgSkillLearning;\n const cooldowns=JSON.parse(document.currentScript.dataset.cooldowns);\n const turn=()=>S?.playerSkillTurns||0;\n const available=()=>{\n  const data=book.current()?.data,learned=book.learnedIds(data);\n  return skills.map(([job,n,name,group,stats])=>({id:'히든/'+job+'/'+n+'/'+name,name,group,stats})).filter(skill=>learned.has(skill.id)&&book.canUse(skill,data));\n };\n function update(){\n  const previous=select.value;\n  select.querySelector('optgroup[data-hidden-buffs]')?.remove();\n  const list=available();\n  if(list.length){\n   const group=document.createElement('optgroup');\n   group.label='히든 직업';\n   group.dataset.hiddenBuffs='1';\n   for(const skill of list)group.append(new Option(skill.name,skill.id));\n   select.append(group);\n   select.disabled=false;\n   if(list.some(skill=>skill.id===previous))select.value=previous;\n   else if(!select.options[0]?.value.match(/^\\d+$/))select.value=list[0].id;\n  }\n  const skill=list.find(row=>row.id===select.value);\n  if(!skill)return;\n  const left=Math.max(0,(S?.hiddenBuffCooldowns?.[skill.id]||0)-turn());\n  document.querySelector('#combatSkillInfo').textContent=skill.name+' · '+(left?'쿨타임 '+left+'턴':'사용 가능');\n  button.disabled=!S?.active||S.over||S.turn!=='player'||left>0;\n }\n function enemy(){\n  const selected=document.querySelector('#monsterTarget')?.value;\n  return S.ai?.minions?.find(row=>row.hp>0&&(S.ai.splitBody||row.id===selected))??S.m;\n }\n function useAbyss(skill){\n  const target=enemy(),marks=target.abyssMarks||0;\n  if(skill.group==='abyssSeal'){\n   if(marks<2){add('심연 표식 2개가 필요해.','bad');return false}\n   if(target!==S.m){add('이 전투에서는 본체에만 심연 봉인을 적용할 수 있어.','bad');return false}\n   target.abyssMarks=marks-2;\n   if(/보스|절대자/.test(target.grade)){\n    for(const stat of ['atk','mag'])S.ai.buffs.push({stat,value:-20,until:S.ai.turn+2});\n   }else S.petSkip=(S.petSkip||0)+1;\n   add('✨ 심연 봉인 · 심연 표식 2개 소모.','good');\n   return true;\n  }\n  if(skill.group==='abyssBurst'&&!marks){add('심연 표식이 필요해.','bad');return false}\n  const area=skill.group==='abyssCollapse';\n  const minions=(S.ai?.minions??[]).filter(row=>row.hp>0);\n  const targets=area?[...minions,...(S.ai?.splitBody&&minions.length?[]:[S.m])]:[target];\n  const roll=die(100),bonus=speedBonus(petEffective('spd'),monsterSpeed())+Number(document.querySelector('#bonus')?.value||0)+monsterHitPenalty();\n  const landed=roll!==1&&roll+bonus>=31;\n  const selector=document.querySelector('#monsterTarget');\n  for(const victim of targets){\n   const count=victim.abyssMarks||0;\n   const ratio=area?4.2:skill.group==='abyssHand'?2.2:1.2*count;\n   const rawDefense=victim===S.m?monsterStat('def'):victim.def;\n   const guard=abyssDefense(victim,rawDefense);\n   if(skill.group!=='abyssHand')victim.abyssMarks=0;\n   if(!landed)continue;\n   const damage=petOutgoing(Math.max(1,Math.floor((petEffective('mag')*ratio-guard*(1-playerDefenseIgnore()/100)*.5)*(area?1+count*.15:1)*(roll===100?1.5:1))),'마법',true);\n   const before=victim.hp;\n   if(area&&victim!==S.m)victim.hp=Math.max(0,victim.hp-damage);\n   else{\n    const previous=selector?.value;\n    try{\n     if(area&&selector)selector.value='';\n     S.m.hp-=monsterReceive(damage,'마법',document.querySelector('#attackElement')?.value);\n    }finally{if(area&&selector)selector.value=previous}\n   }\n   const dealt=Math.max(0,before-Math.max(0,victim.hp));\n   if(dealt&&victim.hp>0&&skill.group==='abyssHand')victim.abyssMarks=Math.min(3,count+1);\n   add('✨ '+skill.name+' · '+victim.name+' · '+nf.format(dealt)+' 피해.','good');\n  }\n  if(!landed)add(skill.name+' · D100 '+roll+' → 빗나감.','bad');\n  return true;\n }\n const defense=monsterDefense;\n function abyssDefense(target,value){\n  const data=book.current()?.data,id='히든/심연술사/4/깊은 흔적';\n  const passive=book.learnedIds(data).has(id)&&book.canUse(id,data);\n  return value*(1-(passive?(target.abyssMarks||0)*.08:0));\n }\n monsterDefense=()=>abyssDefense(enemy(),defense());\n const effective=petEffective;\n petEffective=function(stat){\n  const buffs=Object.values(S?.hiddenCombatBuffs||{});\n  const bonus=buffs.reduce((sum,buff)=>sum+(buff.until>turn()?(buff.stats[stat]||0):0),0);\n  const data=book.current()?.data;\n  const passive='히든/반천 반악/4/경계의 존재';\n  const hp=S?.p?.hp/S?.p?.max;\n  const boundary=['atk','def','mag','spd'].includes(stat)&&hp>=.4&&hp<=.6\n   &&book.learnedIds(data).has(passive)&&book.canUse(passive,data);\n  return playerStatCap(stat,effective(stat)*(1+(bonus+(boundary?15:0))/100));\n };\n const refresh=globalThis.RpgCombatSkillRefresh;\n globalThis.RpgCombatSkillRefresh=()=>{refresh?.();update()};\n select.addEventListener('change',update);\n document.querySelector('#start')?.addEventListener('click',()=>setTimeout(update,0));\n button.addEventListener('click',event=>{\n  const skill=available().find(row=>row.id===select.value);\n  if(!skill)return;\n  event.stopImmediatePropagation();\n  if(!S?.active||S.over||S.returnChannel||S.petPending||S.turn!=='player')return;\n  const cds=S.hiddenBuffCooldowns??={};\n  const now=turn();\n  if((cds[skill.id]||0)>now)return;\n  if(skill.group==='worldTreeBreath'){\n   const before=S.p.hp;\n   const power=Math.floor(petEffective('mag')*2.2);\n   const healing=equipmentApi()?.heal(power,S.equipment?.modifiers)??power;\n   S.p.hp=Math.min(S.p.max,S.p.hp+healing);\n   const ailment=S.ai?.dots?.shift();\n   add('✨ 세계수의 숨결 · HP '+(S.p.hp-before)+' 회복'+(ailment?' · '+ailment.name+' 해제':'')+'.','good');\n   cds[skill.id]=now+cooldowns[skill.name]+1;\n   finish();\n   if(!S.over)petAfterAction();\n   update();\n   return;\n  }\n  if(skill.group.startsWith('abyss')){\n   if(!useAbyss(skill))return;\n   if(cooldowns[skill.name])cds[skill.id]=now+cooldowns[skill.name]+1;\n   finish();\n   if(!S.over)petAfterAction();\n   update();\n   return;\n  }\n  const song=skill.group.endsWith('Song'),history=S.hiddenSongHistory??=[];\n  const symphony=skill.group==='symphony';\n  if(skill.group==='lifeSong'&&history.at(-1)===skill.group){\n   add('같은 선율을 연속으로 사용할 수 없어.','bad');\n   return;\n  }\n  if(symphony&&new Set(history.slice(-4)).size!==4){\n   add('서로 다른 네 선율을 먼저 연주해 줘.','bad');\n   return;\n  }\n  if(song){history.push(skill.group);if(history.length>4)history.shift()}\n  if(symphony||skill.group==='lifeSong'){\n   const heal=Math.floor(symphony?S.p.max*.3:petEffective('mag')*1.4);\n   S.p.hp=Math.min(S.p.max,S.p.hp+heal);\n  }\n  if(skill.group==='blood')S.p.hp=Math.max(1,S.p.hp-Math.floor(S.p.hp*.1));\n  if(skill.group!=='lifeSong')(S.hiddenCombatBuffs??={})[skill.group]={stats:skill.stats,until:now+(song?3:4)};\n  if(cooldowns[skill.name])cds[skill.id]=now+cooldowns[skill.name]+1;\n  add('✨ '+skill.name+(skill.group==='lifeSong'?' · HP 회복.':song?' · 2턴 동안 능력치 강화.':symphony?' · HP 회복 및 3턴 동안 능력치 강화.':' · 3턴 동안 능력치 강화.'),'good');\n  finish();\n  if(!S.over)petAfterAction();\n  update();\n },true);\n update();\n})()";
-  doc.body.append(script);
-  script.remove();
- },0)}
- frame?.addEventListener('load',connect);
- connect();
+function installHiddenCombat(skills) {
+  const select = document.querySelector('#combatSkill');
+  const button = document.querySelector('#useCombatSkill');
+  const info = document.querySelector('#combatSkillInfo');
+  const book = parent.RpgSkillLearning;
+  if (!select || !button || !info || !book || select.dataset.hiddenCombat) return;
+  select.dataset.hiddenCombat = '1';
+
+  const effects = {
+    ...({
+  '균열 참격': {
+    use(c) {
+      c.hit({
+        stat: 'atk',
+        ratio: 2.3,
+        ignore: c.knows('무너진 경계') ? 35 : 25,
+      });
+    },
+  },
+  '차원 전송': {
+    reason(c) {
+      if (c.h?.dimensionStore || c.h?.dimensionAttack) return '이미 차원에 보관 중인 공격이 있어.';
+    },
+    use(c) {
+      c.h.dimensionStore = true;
+      c.log('다음 비궁극기 공격을 차원에 보관해.');
+    },
+  },
+  '위상 도약': {
+    use(c) {
+      c.h.directGuard = 1;
+      c.h.phasePriority = true;
+      c.log('다음 직접 공격 1회를 무효화하고 다음 라운드에 먼저 행동해.');
+    },
+  },
+  '차원장': {
+    use(c) {
+      c.hit({stat: 'atk', ratio: 5.6, ignore: 50});
+    },
+  },
+  '천마 양단': {
+    reason(c) {
+      if (!['heaven', 'hell'].includes(c.choice)) return '천계 또는 마계 속성을 선택해.';
+    },
+    use(c) {
+      const changed = c.h.lastHeavenHell && c.h.lastHeavenHell !== c.choice;
+      c.h.lastHeavenHell = c.choice;
+      c.hit({stat: 'higher', ratio: 2.6, multiplier: changed ? 1.2 : 1});
+      if (changed) c.log('천마 양단 · 반대 속성으로 피해 +20%.');
+    },
+  },
+  '두 문의 권능': {
+    reason(c) {
+      if (!['heaven', 'hell'].includes(c.choice)) return '천계 또는 마계 형태를 선택해.';
+    },
+    use(c) {
+      c.h.lastHeavenHell = c.choice;
+      if (c.choice === 'heaven') {
+        c.heal(c.ally.max * 0.25, c.ally);
+      } else {
+        c.buff('두 문의 권능', {def: -20, mag: -20}, 2, c.target);
+      }
+    },
+  },
+  '양면 결계': {
+    use(c) {
+      c.h.barrier = {until: c.now + 1, reduction: 0.4, reflection: 0.2};
+      c.log('1턴 동안 받는 피해 40% 감소 · 막은 피해의 20%를 반환해.');
+    },
+  },
+  '천지마계 붕괴': {
+    use(c) {
+      c.area({stat: 'higher', ratio: 5});
+    },
+  },
+  '심연의 손': {
+    use(c) {
+      const result = c.hit({stat: 'mag', ratio: 2.2});
+      if (result.landed && c.target.hp > 0) {
+        c.target.hiddenAbyssMarks = Math.min(3, (c.target.hiddenAbyssMarks || 0) + 1);
+        c.log(c.target.name + ' · 심연 표식 ' + c.target.hiddenAbyssMarks + '/3.');
+      }
+    },
+  },
+  '표식 폭발': {
+    reason(c) {
+      if (!(c.target?.hiddenAbyssMarks > 0)) return '대상에게 심연 표식이 필요해.';
+    },
+    use(c) {
+      const marks = c.target.hiddenAbyssMarks;
+      c.hit({stat: 'mag', ratio: 1.2 * marks});
+      c.target.hiddenAbyssMarks = 0;
+      c.log('심연 표식 ' + marks + '개 소모.');
+    },
+  },
+  '심연 봉인': {
+    reason(c) {
+      if (!(c.target?.hiddenAbyssMarks >= 2)) return '대상에게 심연 표식 2개가 필요해.';
+    },
+    use(c) {
+      c.target.hiddenAbyssMarks -= 2;
+      if (c.isBoss(c.target)) {
+        c.buff('심연 봉인', {atk: -20, mag: -20}, 2, c.target);
+        c.log('심연 표식 2개 소모 · 보스 공격·마력 -20% 2턴.');
+      } else {
+        c.skip(c.target);
+        c.log('심연 표식 2개 소모 · 대상 행동 1회 봉인.');
+      }
+    },
+  },
+  '심연핵 붕괴': {
+    use(c) {
+      for (const target of c.targets) {
+        if (target.hp <= 0) continue;
+        const marks = target.hiddenAbyssMarks || 0;
+        c.hit({target, stat: 'mag', ratio: 4.2, multiplier: 1 + 0.15 * marks});
+        target.hiddenAbyssMarks = 0;
+        if (marks) c.log(target.name + ' · 심연 표식 ' + marks + '개 소모.');
+      }
+    },
+  },
+}),
+    ...({
+  '망자 소환': {
+    reason(c) {
+      const summons = (c.h.summons || []).filter(summon => summon.remaining > 0);
+      if (summons.some(summon => summon.area)) {
+        return '망자 군단이 활동 중에는 일반 소환수를 추가할 수 없어.';
+      }
+      if (summons.reduce((count, summon) => count + summon.count, 0) > 0) {
+        return '일반 소환수는 최대 2기야. 해골 2기를 소환할 자리가 없어.';
+      }
+    },
+    use(c) {
+      c.summon('해골', 2, 3, .7);
+    },
+  },
+  '영혼 수확': {
+    use(c) {
+      const result = c.hit({stat: 'mag', ratio: 2.1});
+      if (result.damage > 0) {
+        c.heal(result.damage * .4);
+        if (result.target.hp <= 0) c.h.soulHarvestTarget = result.target;
+      }
+    },
+  },
+  '뼈 감옥': {
+    use(c) {
+      const result = c.hit({stat: 'mag', ratio: 1.6});
+      if (!result.landed || result.target.hp <= 0) return;
+      if (c.isBoss(result.target)) {
+        c.buff('뼈 감옥', {spd: -20}, 2, result.target);
+      } else {
+        c.root(result.target, 1);
+      }
+    },
+  },
+  '망자 군단': {
+    use(c) {
+      c.summon('망자 군단', 1, 3, 1.8, {area: true});
+    },
+  },
+  '세계수의 숨결': {
+    use(c) {
+      const amount = Math.floor(c.stat('mag') * 2.2);
+      const healing = c.ally === c.S.p
+        ? equipmentApi()?.heal(amount, c.S.equipment?.modifiers) ?? amount
+        : amount;
+      c.heal(healing, c.ally);
+      c.cleanse(c.ally);
+    },
+  },
+  '대지의 속박': {
+    use(c) {
+      const result = c.hit({stat: 'mag', ratio: 1.9});
+      if (!result.landed || result.target.hp <= 0) return;
+      if (c.isBoss(result.target)) {
+        c.buff('대지의 속박', {spd: -20}, 2, result.target);
+      } else {
+        c.root(result.target, 1);
+      }
+    },
+  },
+  '태고의 수호수': {
+    reason(c) {
+      const summons = (c.h.summons || []).filter(summon => summon.remaining > 0);
+      if (summons.some(summon => summon.area)) {
+        return '망자 군단이 활동 중에는 일반 소환수를 추가할 수 없어.';
+      }
+      if (summons.reduce((count, summon) => count + summon.count, 0) >= 2) {
+        return '일반 소환수는 최대 2기야. 수호수를 소환할 자리가 없어.';
+      }
+    },
+    use(c) {
+      c.summon('태고의 수호수', 1, 3, 1.8, {guard: 10});
+    },
+  },
+  '세계수의 심판': {
+    use(c) {
+      c.hit({stat: 'mag', ratio: 4.5, ignore: 40, multiplier: c.isUndead(c.target) ? 1.8 : 1});
+    },
+  },
+  '전쟁의 선율': {
+    use(c) {
+      const songs = c.h.songs ??= [];
+      songs.push('전쟁의 선율');
+      if (songs.length > 4) songs.shift();
+      for (const ally of c.allies) c.buff('전쟁의 선율', {atk: 20, mag: 20}, 2, ally);
+    },
+  },
+  '수호의 선율': {
+    use(c) {
+      const songs = c.h.songs ??= [];
+      songs.push('수호의 선율');
+      if (songs.length > 4) songs.shift();
+      for (const ally of c.allies) c.buff('수호의 선율', {def: 25}, 2, ally);
+    },
+  },
+  '질주의 선율': {
+    use(c) {
+      const songs = c.h.songs ??= [];
+      songs.push('질주의 선율');
+      if (songs.length > 4) songs.shift();
+      for (const ally of c.allies) c.buff('질주의 선율', {spd: 25}, 2, ally);
+    },
+  },
+  '생명의 선율': {
+    reason(c) {
+      if (c.h.songs?.at(-1) === '생명의 선율') return '같은 선율을 연속으로 사용할 수 없어.';
+    },
+    use(c) {
+      const songs = c.h.songs ??= [];
+      songs.push('생명의 선율');
+      if (songs.length > 4) songs.shift();
+      const healing = c.stat('mag') * 1.4;
+      for (const ally of c.allies) c.heal(healing, ally);
+    },
+  },
+  '세계의 교향곡': {
+    reason(c) {
+      if (new Set(c.h.songs?.slice(-4)).size !== 4) {
+        return '서로 다른 네 선율을 먼저 연주해 줘.';
+      }
+    },
+    use(c) {
+      for (const ally of c.allies) {
+        c.heal(ally.max * .3, ally);
+        c.buff('세계의 교향곡', {atk: 20, def: 20, mag: 20, spd: 20}, 3, ally);
+      }
+    },
+  },
+}),
+    ...({
+  '시간 지연': {
+    use(c) {
+      c.delay(c.target);
+      c.buff('시간 지연', { spd: -20 }, 1, c.target);
+      c.log(`${c.target.name}의 다음 행동을 순서 끝으로 옮기고 이속을 1턴 낮췄어.`);
+    },
+  },
+  '가속된 순간': {
+    use(c) {
+      c.buff('가속된 순간', { spd: 30 }, 1, c.ally);
+      if (c.ally === c.S.p) c.h.nextCooldownDiscount = 1;
+      else c.ally.hiddenCooldownDiscount = 1;
+      c.log(`${c.ally.name}의 이속 +30%. 다음 일반 스킬 쿨타임이 1턴 줄어들어.`);
+    },
+  },
+  '되감기': {
+    reason(c) {
+      if (!c.canRewind(c.ally)) return '이 아군의 직전 턴 기록이 있어야 되감을 수 있어.';
+    },
+    use(c) {
+      c.rewind(c.ally);
+      c.log(`${c.ally.name}의 HP와 일반 상태를 직전 턴 기록으로 되돌렸어.`);
+    },
+  },
+  '정지한 세계': {
+    use(c) {
+      for (const target of c.targets) {
+        if (c.isBoss(target)) {
+          c.buff('정지한 세계', { spd: -40 }, 1, target);
+          c.delay(target);
+          c.log(`${target.name}의 이속 -40%. 다음 행동 순서를 마지막으로 옮겼어.`);
+        } else {
+          c.skip(target);
+          c.log(`${target.name}의 다음 행동을 1회 막았어.`);
+        }
+      }
+    },
+  },
+  '공간 도약': {
+    use(c) {
+      c.h.priority = true;
+      c.h.evadeBonus = 20;
+      c.log('다음 행동 순서를 앞당겼어. 직접 공격 1회에 회피 판정 +20.');
+    },
+  },
+  '위치 교환': {
+    reason(c) {
+      if (!c.ally || c.ally === c.S.p) return '위치를 바꿀 다른 아군을 골라 줘.';
+      if (!c.canExchange(c.ally)) return '확정 대상이 지정됐거나 선택한 아군과 위치를 바꿀 수 없어.';
+    },
+    use(c) {
+      c.exchange(c.ally);
+      c.log(`${c.ally.name}과 위치 및 대상 지정 상태를 교환했어.`);
+    },
+  },
+  '공간 고정': {
+    use(c) {
+      if (c.isBoss(c.target)) {
+        c.buff('공간 고정', { spd: -25 }, 2, c.target);
+        c.log(`${c.target.name}의 이속을 2턴 동안 25% 낮췄어.`);
+      } else {
+        c.root(c.target, 2);
+        c.log(`${c.target.name}의 이동을 2턴 동안 막았어.`);
+      }
+    },
+  },
+  '무한 격리': {
+    use(c) {
+      c.hit({ stat: 'mag', ratio: 4.8 });
+      c.isolate(c.target);
+    },
+  },
+  '실패 완화': {
+    reason(c) {
+      if (c.h.failSoft || c.h.failSoftUsed) return '이번 전투에서 이미 실패 완화를 준비했어.';
+    },
+    use(c) {
+      c.h.failSoft = true;
+      c.log('다음 치명적 실패 1회를 일반 실패로 바꿔.');
+    },
+  },
+  '운명의 재굴림': {
+    reason(c) {
+      if (c.h.reroll === c.ally) return '이 아군에게 아직 사용하지 않은 재굴림이 있어.';
+      if (c.h.reroll && c.allies.includes(c.h.reroll)) return '준비된 재굴림을 먼저 사용해 줘.';
+    },
+    use(c) {
+      c.h.reroll = c.ally;
+      c.log(`${c.ally.name}의 다음 전투 판정을 다시 굴려. 새 결과를 그대로 사용해.`);
+    },
+  },
+  '결과 분산': {
+    reason(c) {
+      if (c.target.hiddenDisperse) return '이 적에게 아직 발동하지 않은 결과 분산이 있어.';
+      if (c.canDisperse && !c.canDisperse(c.target)) return '보스의 확정 행동에는 결과 분산을 쓸 수 없어.';
+    },
+    use(c) {
+      c.target.hiddenDisperse = true;
+      c.log(`${c.target.name}의 다음 자연 96~100 판정을 일반 성공으로 낮춰.`);
+    },
+  },
+  '운명의 설계': {
+    use(c) {
+      c.h.floorRoll = { allies: new Set(c.allies), through: c.now + 1 };
+      c.log('아군마다 첫 전투 판정의 최종값을 최소 50으로 보정해. 자연 1은 그대로 처리해.');
+    },
+  },
+}),
+    ...({
+  '용혈 참격': {
+    use(c) {
+      const breath = ((c.h.dragonHits || 0) + 1) % 3 === 0;
+      const result = c.hit({ stat: 'atk', ratio: breath ? 3.6 : 2.4 });
+      if (breath && result.landed) c.log('용의 숨결 · 세 번째 직접 공격에 공격력 120% 추가 피해.');
+    },
+  },
+  '용린 강화': {
+    use(c) {
+      c.buff('dragonScales', { def: 30, resist: 15 }, 2);
+    },
+  },
+  '혈맥 폭발': {
+    use(c) {
+      const hpCost = Math.min(c.S.p.hp - 1, Math.floor(c.S.p.hp * 0.1));
+      c.S.p.hp -= hpCost;
+      c.buff('dragonBlood', { atk: 25, spd: 25 }, 3);
+      c.log('혈맥 폭발 · HP ' + hpCost + ' 소모.');
+    },
+  },
+  '용왕의 숨결': {
+    use(c) {
+      c.area({ stat: 'atk', ratio: 4.2, ignore: 30 });
+    },
+  },
+  '전사의 성좌': {
+    use(c) {
+      c.h.star = { kind: 'war', until: c.now + 3 };
+      c.buff('star', { atk: 25 }, 3);
+    },
+  },
+  '수호의 성좌': {
+    use(c) {
+      c.h.star = { kind: 'guard', until: c.now + 3 };
+      c.buff('star', { def: 30 }, 3);
+    },
+  },
+  '현자의 성좌': {
+    use(c) {
+      c.h.star = { kind: 'sage', until: c.now + 3 };
+      c.buff('star', { mag: 25 }, 3);
+    },
+  },
+  '성좌 낙하': {
+    use(c) {
+      const star = c.h.star;
+      const magic = c.stat('mag');
+      c.area({ stat: 'mag', ratio: 4.5 });
+      if (!star || c.now > star.until) return;
+      const support = { war: { atk: 25 }, guard: { def: 30 }, speed: { spd: 25 } };
+      for (const ally of c.allies) {
+        if (ally.hp <= 0) continue;
+        if (star.kind === 'sage') c.heal(magic, ally);
+        else if (support[star.kind]) c.buff('fallenStar', support[star.kind], 2, ally);
+      }
+    },
+  },
+  '낮은 쪽의 힘': {
+    use(c) {
+      const ranked = ['atk', 'def', 'mag'].map(stat => ({
+        stat,
+        value: c.stat(stat, c.ally),
+      })).sort((a, b) => a.value - b.value);
+      const lowest = ranked[0];
+      const highest = ranked[2].value;
+      c.h.lowestBoost = {
+        target: c.ally,
+        stat: lowest.stat,
+        amount: Math.min(highest - lowest.value, highest * 0.2),
+        cap: highest,
+        until: c.now + 3,
+      };
+    },
+  },
+  '높은 쪽의 억제': {
+    reason(c) {
+      if (c.canSuppress && !c.canSuppress(c.target)) return '억제할 강화 효과가 없어.';
+    },
+    use(c) {
+      if (c.suppress(c.target) === false) return '억제할 강화 효과가 없어.';
+    },
+  },
+  '균형 회복': {
+    reason(c) {
+      if (c.allies.length < 2) return 'HP를 나눌 생존 아군이 필요해.';
+    },
+    use(c) {
+      const totalHp = c.allies.reduce((sum, ally) => sum + ally.hp, 0);
+      const totalMax = c.allies.reduce((sum, ally) => sum + ally.max, 0);
+      const ratio = totalHp / totalMax;
+      const shares = c.allies.map(ally => {
+        const quota = ally.max * ratio;
+        return { ally, quota, hp: Math.max(1, Math.floor(quota)) };
+      });
+
+      // Round proportional shares without creating HP or knocking an ally out.
+      let remaining = Math.floor(totalHp) - shares.reduce((sum, share) => sum + share.hp, 0);
+      if (remaining > 0) {
+        const descending = shares.slice().sort((a, b) => (b.quota - b.hp) - (a.quota - a.hp));
+        for (const share of descending) {
+          if (!remaining) break;
+          if (share.hp >= share.ally.max) continue;
+          share.hp++;
+          remaining--;
+        }
+      } else if (remaining < 0) {
+        const descending = shares.slice().sort((a, b) => b.hp - a.hp);
+        for (const share of descending) {
+          if (!remaining) break;
+          const excess = Math.min(-remaining, share.hp - 1);
+          share.hp -= excess;
+          remaining += excess;
+        }
+      }
+      for (const share of shares) share.ally.hp = share.hp;
+      c.log('균형 회복 · 생존 아군의 HP를 최대 HP 비율에 맞춰 나눴어.');
+    },
+  },
+  '완전한 평형': {
+    use(c) {
+      c.h.balanceUntil = c.now + 2;
+    },
+  },
+}),
+  };
+  const names = new Set(skills.map(skill => skill.name));
+  const byId = new Map(skills.map(skill => [skill.id, skill]));
+  const isPassive = skill => skill.kind === '패시브';
+  const stats = ['atk', 'def', 'mag', 'spd'];
+  const labels = {atk:'공격력', def:'방어력', mag:'마력', spd:'이속'};
+  const stars = {war:{atk:25}, guard:{def:30}, sage:{mag:25}, speed:{spd:25}};
+  const isBoss = target => /보스|절대자/.test(target?.grade || '');
+  const isUndead = target => !!target?.undead || /좀비|스켈레톤|망령|해골|네크로맨서/.test(target?.name || '');
+  const isDragon = target => /고대룡|황룡|와이번|드래곤/.test(target?.name || '');
+  const turn = () => S?.playerSkillTurns || 0;
+  const state = () => S?.hiddenCombat;
+  const knows = name => state()?.known.has(name) || false;
+  const log = text => add('✨ ' + text, 'good');
+  const enemies = () => {
+    if (!S?.ai) return [];
+    return [...(!S.ai.splitBody && S.m.hp > 0 ? [S.m] : []), ...S.ai.minions.filter(x => x.hp > 0)];
+  };
+  const target = () => {
+    const active = enemies();
+    return active.find(x => x.id && x.id === $('#monsterTarget')?.value) || active[0];
+  };
+  const allies = () => S ? [S.p, ...(state()?.summons || []).flatMap(x => x.units).filter(x => x.hp > 0)] : [];
+  const ready = () => !!(S?.active && !S.over && S.turn === 'player' && !S.returnChannel && !S.petPending);
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const liveBuffs = actor => Object.values(actor?.hiddenBuffs || {}).filter(b => b.until >= turn());
+  const buffTotal = (actor, key) => liveBuffs(actor).reduce((n, b) => n + (b.stats[key] || 0), 0);
+  const balanced = () => !!state()?.balanceUntil && state().balanceUntil >= turn();
+  function buff(key, values, rounds, actor = S.p) {
+    (actor.hiddenBuffs ??= {})[key] = {stats:values, until:turn() + rounds};
+  }
+  function stat(key, actor = S.p) {
+    if (actor === S.p) return petEffective(key);
+    if (actor === S.m) return monsterStat(key);
+    const base = actor[key] || 0;
+    if (key === 'spd' && actor.hiddenRootUntil >= turn()) return 0;
+    const pct = buffTotal(actor, key) - (key === 'def' && knows('깊은 흔적') ? (actor.hiddenAbyssMarks || 0) * 8 : 0);
+    let value = base * (1 + pct / 100);
+    const low = state()?.lowestBoost;
+    if (low?.target === actor && low.stat === key && low.until >= turn()) value = Math.min(low.cap, value + low.amount);
+    if (balanced() && base > 0) value = clamp(value, base * .7, base * 1.3);
+    return Math.max(0, value);
+  }
+  function heal(amount, actor = S.p) {
+    if (!actor || actor.hp <= 0) return 0;
+    const before = actor.hp;
+    const adjusted = actor === S.p ? monsterPlayerStat('heal', amount) : amount;
+    actor.hp = Math.min(actor.max, before + Math.max(0, Math.floor(adjusted)));
+    return actor.hp - before;
+  }
+  function cleanse(actor = S.p) {
+    if (actor !== S.p) {
+      if (!actor.hiddenRootUntil) return 0;
+      delete actor.hiddenRootUntil;
+      return 1;
+    }
+    try {
+      const out = potionCleanse(S.ai, 'all', 1);
+      S.ai.dots = out.dots;
+      S.ai.debuffs = out.debuffs;
+      return out.removed;
+    } catch (_) {
+      for (const key of ['root', 'fear']) {
+        if (S.ai[key] >= S.ai.turn) {
+          delete S.ai[key];
+          return 1;
+        }
+      }
+      return 0;
+    }
+  }
+  function summon(name, count, remaining, ratio, {area = false, guard = 0} = {}) {
+    const h = state();
+    const existing = h.summons.find(x => x.name === name && x.remaining > 0);
+    if (existing) return false;
+    const units = Array.from({length:count}, (_, i) => {
+      const max = Math.max(1, Math.floor(S.p.max * .2));
+      return {id:'ally-' + (++h.serial), name:name + (count > 1 ? ' ' + (i + 1) : ''), max, hp:max,
+        atk:S.p.atk, def:S.p.def, mag:S.p.mag, spd:S.p.spd};
+    });
+    h.summons.push({name,count,remaining,ratio,area,guard,units});
+    return true;
+  }
+  function skip(actor) {
+    if (actor === S.m) state().skipEnemy = true;
+    else actor.hiddenSkip = true;
+  }
+  function delay(actor) {
+    if (actor === S.m) state().delayEnemy = true;
+    else actor.hiddenDelay = true;
+  }
+  function root(actor, rounds) {
+    actor.hiddenRootUntil = turn() + rounds;
+  }
+  function canDisperse(actor) {
+    return !!actor && !(actor === S.m && (S.ai.charge || state()?.fixedAttack));
+  }
+  function canExchange(actor) {
+    return actor && actor !== S.p && actor.hp > 0 && allies().includes(actor) && !S.ai.charge;
+  }
+  function exchange(actor) {
+    if (!canExchange(actor)) return false;
+    state().swapTarget = state().swapTarget === actor ? null : actor;
+    return true;
+  }
+  function canRewind(actor) {
+    return !!(actor?.hp > 0 && state()?.previous?.get(actor));
+  }
+  function rewind(actor) {
+    if (!canRewind(actor)) return false;
+    const previous = state().previous.get(actor);
+    actor.hp = clamp(previous.hp, 1, actor.max);
+    if (actor === S.p) {
+      const ordinary = effect => effect.dispellable !== false && !effect.uncleansable;
+      S.ai.dots = [...S.ai.dots.filter(x => !ordinary(x)), ...previous.dots.map(x => ({...x}))];
+      S.ai.debuffs = [...S.ai.debuffs.filter(x => !ordinary(x)), ...previous.debuffs.map(x => ({...x, until:S.ai.turn + x.left - 1}))];
+      for (const key of ['root','fear']) {
+        if (previous[key] > 0) S.ai[key] = S.ai.turn + previous[key] - 1;
+        else delete S.ai[key];
+      }
+    }
+    return true;
+  }
+  function isolate(actor) {
+    if (!actor) return false;
+    // A split body is an encounter condition rather than a summoned unit.
+    const minions = S.ai.splitBody ? [] : S.ai.minions.filter(x => x.hp > 0 && x !== actor && !x.fixedTarget);
+    for (const unit of minions) unit.hp = 0;
+    if (actor !== S.m && !S.ai.splitBody && !actor.fixedTarget) actor.hp = 0;
+    const fields = S.ai.dots.filter(x => /지대|장판|지옥문|마왕성|눈보라/.test(x.name) && x.dispellable !== false && !x.uncleansable);
+    S.ai.dots = S.ai.dots.filter(x => !fields.includes(x));
+    return minions.length + fields.length;
+  }
+  function strongest(actor) {
+    const h = state();
+    const all = liveBuffs(actor).flatMap(b => Object.keys(b.stats).map(key => ({b,key,value:b.stats[key]})));
+    if (actor === S.m) for (const b of S.ai.buffs) {
+      if (b.until >= S.ai.turn) all.push({b,key:b.stat,value:b.value,native:true});
+    }
+    if (actor === S.m && isBoss(actor) && S.ai.phase && !(h.phaseSuppressedUntil >= turn())) all.push({phase:true,value:25});
+    return all.filter(x => x.value > 0).sort((a,b) => b.value - a.value)[0];
+  }
+  function canSuppress(actor) { return !!(actor && strongest(actor)); }
+  function suppress(actor) {
+    const strongestBuff = strongest(actor);
+    if (!strongestBuff) return false;
+    const {phase,b,key,value,native} = strongestBuff;
+    if (phase) {
+      state().phaseSuppressedUntil = turn() + 2;
+    } else {
+      const cut = isBoss(actor) && native && b.until - S.ai.turn > 100 ? .2 : .5;
+      if (native) {
+        (state().nativeSuppress ??= new Map()).set(b, {cut,until:turn()+2});
+      } else {
+        buff('suppressed-' + key, {[key]:-value * cut}, 2, actor);
+      }
+    }
+    return true;
+  }
+
+  const baseDie = die;
+  function playerRoll(natural, actor = S.p) {
+    const h = state();
+    if (!h) return {natural};
+    if (h.reroll === actor) {
+      const old = natural;
+      natural = baseDie(100);
+      h.reroll = null;
+      log('운명의 재굴림 · ' + old + ' → ' + natural);
+    }
+    const softened = natural === 1 && h.failSoft && !h.failSoftUsed && actor === S.p;
+    if (softened) {
+      h.failSoft = false;
+      h.failSoftUsed = true;
+      log('실패 완화 · 치명적 실패를 일반 실패로 변경.');
+    }
+    if (knows('극값의 기억') && actor === S.p && (natural === 1 || natural === 100)) {
+      if (h.lastExtreme && natural !== h.lastExtreme && h.extremeTurn !== turn()) {
+        h.nextCooldownDiscount = Math.max(h.nextCooldownDiscount || 0, 1);
+        h.extremeTurn = turn();
+        log('극값의 기억 · 다음 일반 스킬 쿨타임 1턴 감소.');
+      }
+      h.lastExtreme = natural;
+    }
+    const floor = h.floorRoll;
+    const affected = floor && turn() <= floor.through && floor.allies.delete(actor) && natural !== 1;
+    return {natural,floor:affected ? 50 : 0,softened};
+  }
+  function enemyRoll(natural, actor) {
+    if (natural >= 96 && actor?.hiddenDisperse && canDisperse(actor)) {
+      actor.hiddenDisperse = false;
+      log('결과 분산 · 자연값 ' + natural + '을 일반 성공으로 낮췄어.');
+      return 95;
+    }
+    return natural;
+  }
+  function withTarget(actor, run) {
+    const selector = $('#monsterTarget');
+    if (!selector) return run();
+    const selected = selector.value;
+    selector.value = actor === S.m ? 'boss' : actor.id;
+    try { return run(); }
+    finally { selector.value = selected; }
+  }
+  function withNativeSuppression(run) {
+    const h = state();
+    if (!h?.nativeSuppress || h.suppressionDepth) return run();
+    const restore = [];
+    for (const [effect,suppression] of h.nativeSuppress) {
+      if (suppression.until < turn() || !S.ai.buffs.includes(effect)) {
+        h.nativeSuppress.delete(effect);
+        continue;
+      }
+      restore.push([effect,effect.value]);
+      effect.value *= 1 - suppression.cut;
+    }
+    h.suppressionDepth = 1;
+    try { return run(); }
+    finally {
+      h.suppressionDepth = 0;
+      for (const [effect,original] of restore) effect.value = original;
+    }
+  }
+  function applyDamage(raw, actor, kind, element, noReflect = false) {
+    if (!actor || actor.hp <= 0) return 0;
+    const before = actor.hp;
+    const h = state();
+    const previousTarget = h.damageTarget;
+    const priorReaction = S.ai.reactTurn;
+    const priorPoison = S.ai.poisonReflect;
+    h.damageTarget = actor;
+    if (noReflect) S.ai.reactTurn = S.ai.poisonReflect = S.ai.turn;
+    try {
+      if (actor === S.m) actor.hp -= withTarget(actor,() => withNativeSuppression(() => baseReceive(raw,kind,element)));
+      else actor.hp -= raw;
+    } finally {
+      if (noReflect) {
+        S.ai.reactTurn = priorReaction;
+        S.ai.poisonReflect = priorPoison;
+      }
+      h.damageTarget = previousTarget;
+    }
+    return Math.max(0, Math.min(before, before - actor.hp));
+  }
+  function attackBonus(actor) {
+    return speedBonus(petEffective('spd'), stat('spd',actor)) + Number($('#bonus').value || 0) + monsterHitPenalty();
+  }
+  function hit(options = {}) {
+    const h = state();
+    const actor = options.target || target();
+    const result = {damage:0,landed:false,target:actor};
+    if (!actor || actor.hp <= 0 || S.p.hp <= 0) return result;
+    if (S.ai.fear >= S.ai.turn && options.direct !== false) {
+      log('공포 상태에서는 직접 공격할 수 없어.');
+      return result;
+    }
+    const source = options.stat === 'higher' ? (petEffective('mag') > petEffective('atk') ? 'mag' : 'atk') : options.stat || 'mag';
+    const kind = source === 'atk' ? '물리' : '마법';
+    const power = options.power ?? petEffective(source);
+    const armor = clamp(withTarget(actor,playerDefenseIgnore) + (options.ignore || 0), 0, 100);
+    const roll = playerRoll(baseDie(100), options.roller || S.p);
+    const final = Math.max(roll.floor || -Infinity, roll.natural + attackBonus(actor));
+    const label = options.name || h.skill?.name || '소환 공격';
+    const element = options.element ?? $('#attackElement').value;
+    const deferred = h.dimensionStore && h.skill?.kind !== '궁극기' && options.direct !== false;
+    if (deferred) h.dimensionStore = false;
+    if (roll.natural === 1 || final < 31) {
+      log(label + ' · D100 ' + roll.natural + (roll.softened ? ' → 일반 실패.' : ' → 빗나감.'));
+      if (roll.natural === 1 && !roll.softened) log('치명적 실패 · D6 ' + baseDie(6) + '.');
+      return result;
+    }
+    let raw = Math.max(1, Math.floor(power * (options.ratio ?? 1) - stat('def',actor) * (1 - armor / 100) * .5));
+    if (roll.natural === 100) raw = Math.floor(raw * 1.5);
+    raw *= options.multiplier ?? 1;
+    if (knows('자연의 순환') && isUndead(actor)) raw *= 1.15;
+    raw = withTarget(actor,() => petOutgoing(Math.floor(raw),kind,options.direct !== false));
+    if (deferred) {
+      h.dimensionAttack = {actor,raw:Math.floor(raw * 1.35),kind,element,due:turn()+1};
+      log('차원 전송 · ' + label + '을 다음 턴 종료로 보관했어.');
+      return result;
+    }
+    result.damage = applyDamage(raw, actor, kind, element, options.noReflect);
+    result.landed = result.damage > 0;
+    log(label + ' · ' + actor.name + ' · D100 ' + roll.natural + ' → ' + result.damage + ' 피해.');
+    return result;
+  }
+  function area(options) { return enemies().map(actor => hit({...options,target:actor})); }
+  function context(skill) {
+    return {S, h:state(), skill, target:target(), targets:enemies(), ally:allySelect.value ? allies().find(x => x.id === allySelect.value) || S?.p : S?.p,
+      allies:allies(), choice:choiceSelect.value, now:turn(), hit,area,buff,heal,skip,delay,root,cleanse,stat,isBoss,isUndead,log,knows,
+      summon,rewind,canRewind,exchange,canExchange,isolate,canDisperse,suppress,canSuppress};
+  }
+
+  const baseEffective = petEffective;
+  petEffective = function(key) {
+    const normal = baseEffective(key);
+    const h = state();
+    if (!h || !stats.includes(key)) return normal;
+    const fraction = S.p.hp / S.p.max;
+    const edge = knows('경계의 존재') && fraction >= .4 && fraction <= .6 ? 15 : 0;
+    const bonus = buffTotal(S.p,key) + edge;
+    let value = normal * (1 + bonus / 100);
+    const low = h.lowestBoost;
+    if (low?.target === S.p && low.stat === key && low.until >= turn()) value = Math.min(low.cap, value + low.amount);
+    if (balanced() && S.p[key] > 0) value = clamp(value, S.p[key] * .7, S.p[key] * 1.3);
+    return playerStatCap(key,value);
+  };
+
+  const baseMonsterStat = monsterStat;
+  monsterStat = function(key) {
+    const h = state();
+    if (!h) return baseMonsterStat(key);
+    let value = withNativeSuppression(() => baseMonsterStat(key));
+    if (S.ai.phase && h.phaseSuppressedUntil >= turn() && ['atk','mag'].includes(key)) value -= S.m[key] * .05;
+    let pct = buffTotal(S.m,key);
+    if (key === 'def' && knows('깊은 흔적')) pct -= (S.m.hiddenAbyssMarks || 0) * 8;
+    if (key === 'spd' && S.m.hiddenRootUntil >= turn() && !h.fixedAttack) return 0;
+    value *= 1 + pct / 100;
+    if (balanced() && S.m[key] > 0) {
+      const activeBuffs = S.ai.buffs;
+      let innate;
+      try {
+        S.ai.buffs = activeBuffs.filter(b => b.until - S.ai.turn > 100);
+        innate = baseMonsterStat(key);
+      } finally { S.ai.buffs = activeBuffs; }
+      value = clamp(value, innate * .7, innate * 1.3);
+    }
+    return Math.max(0,value);
+  };
+  const baseDefense = monsterDefense;
+  monsterDefense = function() {
+    const actor = S?.ai?.splitBody ? S.ai.minions.find(x => x.hp > 0) : target();
+    return state() && actor ? stat('def',actor) : baseDefense();
+  };
+
+  const baseReceive = monsterReceive;
+  monsterReceive = function(raw, kind, element) {
+    const h = state();
+    if (!h || h.damageTarget) return baseReceive(raw,kind,element);
+    const actor = S.ai.splitBody ? S.ai.minions.find(x => x.hp > 0) : target();
+    if (knows('자연의 순환') && isUndead(actor)) raw = Math.floor(raw * 1.15);
+    if (h.dimensionStore && actor && h.ordinarySkill?.kind !== '궁극기') {
+      h.dimensionStore = false;
+      h.dimensionAttack = {actor,raw:Math.floor(raw*1.35),kind,element,due:turn()+1};
+      log('차원 전송 · 다음 턴 종료에 공격을 발동해.');
+      return 0;
+    }
+    return withNativeSuppression(() => baseReceive(raw,kind,element));
+  };
+
+  const baseIncoming = petIncoming;
+  petIncoming = function(amount, direct = true, kind = '물리', magicShare = kind === '마법' ? 1 : 0) {
+    const h = state();
+    if (!h) return baseIncoming(amount,direct,kind,magicShare);
+    const attacker = h.attacker || S.m;
+    if (direct && h.directGuard > 0) {
+      h.directGuard--;
+      log('위상 도약 · 직접 공격을 무효화했어.');
+      return 0;
+    }
+    if (direct && h.swapTarget && allies().includes(h.swapTarget) && !h.fixedAttack) {
+      const actor = h.swapTarget;
+      actor.hp = Math.max(0, actor.hp - amount);
+      log('위치 교환 · ' + actor.name + '에게 피해가 향했어.');
+      if (!actor.hp) h.swapTarget = null;
+      return 0;
+    }
+    if (knows('용의 피') && isDragon(attacker)) amount = Math.floor(amount * .85);
+    const protection = h.summons.reduce((best,x) => x.units.some(u => u.hp > 0) ? Math.max(best,x.guard) : best,0);
+    if (protection) amount = Math.floor(amount * (1 - protection/100));
+    const barrier = h.barrier;
+    if (barrier?.until >= turn()) {
+      const reduced = Math.floor(amount * barrier.reduction);
+      amount -= reduced;
+      if (direct && attacker?.hp > 0) {
+        const reflected = Math.min(attacker.hp, Math.floor(reduced * barrier.reflection));
+        attacker.hp -= reflected;
+        if (reflected) log('양면 결계 · ' + attacker.name + '에게 ' + reflected + ' 피해 반환.');
+      }
+    }
+    const damage = baseIncoming(amount,direct,kind,magicShare);
+    if (damage >= S.p.hp && S.p.hp > 0 && knows('불사의 계약') && h.souls > 0 && !h.contractUsed && !(S.ai.reviveBlock >= S.ai.turn)) {
+      h.contractUsed = true;
+      h.souls--;
+      log('불사의 계약 · 영혼 1개를 소모해 HP 1로 생존.');
+      return S.p.hp - 1;
+    }
+    return damage;
+  };
+  const baseDamage = monsterDamage;
+  let rollContext = null;
+  die = function(sides) {
+    const value = baseDie(sides);
+    const pending = rollContext;
+    if (sides !== 100 || !pending || pending.used || !state()) return value;
+    pending.used = true;
+    if (pending.enemy) {
+      if (pending.evade && value !== 100 && value - pending.evade + pending.bonus < 31) return 1;
+      const result = enemyRoll(value,pending.enemy);
+      pending.dispersed = result !== value;
+      return result;
+    }
+    const roll = playerRoll(value);
+    pending.floor = roll.floor;
+    pending.softened = roll.softened;
+    return roll.natural;
+  };
+  monsterDamage = function(power, ratio, label, ignore, crit, source) {
+    const h = state();
+    if (!h) return baseDamage(power,ratio,label,ignore,crit,source);
+    const minion = source || S.ai.minions.find(unit => unit.name === label && unit.hp > 0);
+    const actor = minion || S.m;
+    if (actor.hiddenSkip) { actor.hiddenSkip = false; log(actor.name + ' · 행동을 잃었어.'); return 0; }
+    if (actor.hiddenDelay) {
+      actor.hiddenDelay = false;
+      h.delayedMinions.push({actor,power,ratio,label,ignore,crit,due:turn()+1});
+      return 0;
+    }
+    if (minion) power = Math.max(stat('atk',minion),stat('mag',minion));
+    const old = rollContext;
+    const previousAttacker = h.attacker;
+    h.attacker = actor;
+    const evade = h.evadeBonus || 0;
+    h.evadeBonus = 0;
+    const hitPenalty = S.ai.debuffs.filter(x=>x.stat==='evade'&&x.until>=S.ai.turn).reduce((n,x)=>n+x.value,0);
+    rollContext = {enemy:actor,evade,bonus:speedBonus(stat('spd',actor),petEffective('spd'))-petNum(/회피 판정\s*\+([\d.]+)/)-hitPenalty};
+    try { return baseDamage(power,ratio,label,ignore,crit,actor === S.m ? null : actor); }
+    finally { rollContext = old; h.attacker = previousAttacker; }
+  };
+
+  const baseAttack = playerAttack;
+  playerAttack = function(kind,rerolled) {
+    const h = state();
+    if (!h || !ready() && !rerolled) return baseAttack(kind,rerolled);
+    const old = rollContext;
+    rollContext = {};
+    if (!rerolled && S.active && !S.over && !(S.ai.fear >= S.ai.turn)) h.dragonHits++;
+    try { return baseAttack(kind,rerolled); }
+    finally { rollContext = old; }
+  };
+  const elementalStatus = /화염|화상|빙결|빙하|얼음|절대영도|번개|감전/;
+  function resistStatus() {
+    const chance = state() ? buffTotal(S.p,'resist') : 0;
+    if (chance <= 0 || baseDie(100) > chance) return false;
+    log('용린 강화 · 상태이상을 저항했어.');
+    return true;
+  }
+  const baseBuff = monsterBuff;
+  monsterBuff = function(key, value, rounds = 2, player = false) {
+    const skill = state()?.enemySkill;
+    if (player && skill) {
+      if (resistStatus()) return;
+      if (knows('용의 피') && elementalStatus.test(skill.name)) rounds--;
+    }
+    if (rounds > 0) return baseBuff(key,value,rounds,player);
+  };
+
+  const baseCast = monsterCast;
+  monsterCast = function(skill, charged) {
+    const h = state();
+    if (!h) return baseCast(skill,charged);
+    h.fixedAttack = !!(charged || /확정 행동|확정 대상/.test(skill?.effect || ''));
+    const initialSkip = S.ai.skip;
+    const rootBefore = S.ai.root;
+    const fearBefore = S.ai.fear;
+    const previousSkill = h.enemySkill;
+    h.enemySkill = skill;
+    try {
+      if (S.m.hiddenRootUntil >= turn() && !h.fixedAttack && /돌진|도약|질주|이동|순간이동/.test(skill?.name || '')) {
+        log('속박 · ' + S.m.name + '의 이동 스킬이 막혔어.');
+        return;
+      }
+      return baseCast(skill,charged);
+    }
+    finally {
+      if (knows('접힌 거리') && !h.distanceUsed && S.ai.root !== rootBefore && S.ai.root >= S.ai.turn) {
+        S.ai.root = rootBefore;
+        h.distanceUsed = true;
+        log('접힌 거리 · 첫 위치·거리 불이익을 무시했어.');
+      }
+      for (const [key, previous] of [['root',rootBefore],['fear',fearBefore]]) {
+        if (S.ai[key] === previous || !(S.ai[key] >= S.ai.turn)) continue;
+        if (resistStatus()) S.ai[key] = previous;
+        else if (knows('용의 피') && elementalStatus.test(skill?.name || '')) S.ai[key]--;
+      }
+      if (knows('시간 파편') && !h.timeFragmentUsed && S.ai.skip > initialSkip && /지연|시간/.test(skill?.effect || '')) {
+        S.ai.skip = initialSkip;
+        h.timeFragmentUsed = true;
+        log('시간 파편 · 행동 지연을 무효화했어.');
+      }
+      h.fixedAttack = false;
+      h.enemySkill = previousSkill;
+    }
+  };
+  const baseDot = monsterDot;
+  monsterDot = function(name,ratio,rounds,cap,power) {
+    if (resistStatus()) return;
+    if (knows('용의 피') && elementalStatus.test(name)) rounds--;
+    if (rounds > 0) {
+      baseDot(name,ratio,rounds,cap,power);
+      if (/해제 불가/.test(state()?.enemySkill?.effect || '')) S.ai.dots.at(-1).uncleansable = true;
+    }
+  };
+  const baseStun = applyPlayerStun;
+  applyPlayerStun = function() {
+    const elemental = elementalStatus.test(state()?.enemySkill?.name || '');
+    if (elemental && knows('용의 피')) {
+      log('용의 피 · 원소 상태이상 지속시간 1턴 감소.');
+      return;
+    }
+    if (resistStatus()) return;
+    return baseStun();
+  };
+
+  const baseFinishMonster = monsterBeforeFinish;
+  monsterBeforeFinish = function() {
+    baseFinishMonster();
+    const h = state();
+    const harvested = h?.soulHarvestTarget;
+    if (!harvested) return;
+    h.soulHarvestTarget = null;
+    if (harvested.hp <= 0) {
+      h.souls = Math.min(3,h.souls+1);
+      log('영혼 수확 · 영혼 ' + h.souls + '/3.');
+    }
+  };
+  const baseTurn = monsterAutoTurn;
+  monsterAutoTurn = function(forceAttack = false) {
+    const h = state();
+    if (!h || S.over) return baseTurn(forceAttack);
+    const due = !forceAttack && h.enemyDue && h.enemyDue <= turn();
+    if (due) {
+      h.enemyDue = 0;
+      const previousEnemyTurn = S.ai.turn;
+      baseTurn();
+      // The native monster turn already advances the next turn when it stuns the player.
+      if (S.over || S.ai.turn > previousEnemyTurn + 1) return;
+    }
+    const nextEnemyTurn = S.ai.turn + 1;
+    const otherEnemyActions = S.ai.minions.some(unit => unit.hp > 0 && unit.until >= nextEnemyTurn && unit.name !== '그림자 분신') ||
+      S.ai.dots.length > 0 || S.ai.seed?.due <= nextEnemyTurn || S.ai.regen?.left > 0;
+    const delayMain = !forceAttack && h.delayEnemy && !h.priority && !h.phasePriority && otherEnemyActions;
+    if (delayMain) {
+      h.delayEnemy = false;
+      log('행동 순서 변경 · ' + S.m.name + '의 행동을 마지막으로 옮겼어.');
+    } else if (!forceAttack && (h.delayEnemy || h.priority || h.phasePriority)) {
+      h.delayEnemy = h.priority = h.phasePriority = false;
+      h.enemyDue = turn()+1;
+      S.turn = 'player';
+      log('행동 순서 변경 · 플레이어가 먼저 행동해.');
+      render();
+      return;
+    }
+    if (!forceAttack && h.skipEnemy) {
+      S.petSkip = (S.petSkip || 0) + 1;
+      h.skipEnemy = false;
+    }
+    baseTurn(forceAttack,delayMain);
+    const pending = h.delayedMinions.filter(x => x.due <= turn());
+    h.delayedMinions = h.delayedMinions.filter(x => x.due > turn());
+    for (const x of pending) if (!S.over && x.actor.hp > 0 && S.p.hp > 0) {
+      monsterDamage(x.power,x.ratio,x.label,x.ignore,x.crit,x.actor);
+      finish();
+    }
+  };
+  const baseAfter = petAfterAction;
+  petAfterAction = function() {
+    const h = state();
+    if (!h || S.over) return baseAfter();
+    if (h.dimensionAttack?.due <= turn()) {
+      const {actor,raw,kind,element} = h.dimensionAttack;
+      delete h.dimensionAttack;
+      const damage = applyDamage(raw,actor,kind,element,true);
+      log('차원 전송 · ' + actor.name + '에게 ' + damage + ' 피해.');
+    }
+    for (const summon of h.summons.filter(x => x.remaining > 0)) {
+      for (const unit of summon.units.filter(x => x.hp > 0)) {
+        const bonus = stat('mag',unit) - unit.mag;
+        const options = {name:summon.name, stat:'mag', ratio:summon.ratio, power:Math.max(0,petEffective('mag')+bonus), direct:false, roller:unit};
+        if (summon.area) area(options);
+        else hit(options);
+      }
+      summon.remaining--;
+    }
+    if (knows('자연의 순환')) heal(S.p.max * .05);
+    finish();
+    if (S.over) return update();
+    h.previous = new Map(allies().map(actor => [actor, snapshot(actor)]));
+    try { return baseAfter(); }
+    finally {
+      h.summons = h.summons.filter(x => x.remaining > 0 && x.units.some(u => u.hp > 0));
+      update();
+    }
+  };
+  function snapshot(actor) {
+    if (actor !== S.p) return {hp:actor.hp};
+    const ordinary = x => x.dispellable !== false && !x.uncleansable;
+    return {hp:actor.hp, dots:S.ai.dots.filter(ordinary).map(x => ({...x})),
+      debuffs:S.ai.debuffs.filter(x => ordinary(x) && x.until >= S.ai.turn).map(x => ({...x,left:x.until-S.ai.turn+1})),
+      root:(S.ai.root ?? -1)-S.ai.turn+1, fear:(S.ai.fear ?? -1)-S.ai.turn+1};
+  }
+
+  const choiceSelect = document.createElement('select');
+  choiceSelect.id = 'hiddenSkillChoice';
+  choiceSelect.setAttribute('aria-label','스킬 형태');
+  choiceSelect.append(new Option('천계','heaven'),new Option('마계','hell'));
+  choiceSelect.hidden = true;
+  const allySelect = document.createElement('select');
+  allySelect.id = 'hiddenSkillAlly';
+  allySelect.setAttribute('aria-label','아군 대상');
+  allySelect.hidden = true;
+  const starSelect = document.createElement('select');
+  starSelect.id = 'hiddenStartingStar';
+  starSelect.setAttribute('aria-label','전투 시작 성좌');
+  for (const [key,label] of Object.entries({war:'전사의 성좌',guard:'수호의 성좌',sage:'현자의 성좌',speed:'질주의 성좌'})) starSelect.add(new Option(label,key));
+  starSelect.hidden = true;
+  const passive = document.createElement('p');
+  passive.id = 'hiddenCombatPassives';
+  info.after(choiceSelect,allySelect,starSelect,passive);
+
+  const baseInitialize = monsterInitialize;
+  monsterInitialize = function() {
+    baseInitialize();
+    const available = learnedSkills();
+    if (!available.length) return;
+    const h = S.hiddenCombat = {known:new Set(available.map(s => s.name)), cooldowns:new Map(),
+      summons:[], souls:0, songs:[], serial:0, dragonHits:0, delayedMinions:[]};
+    if (knows('길잡이 별')) {
+      const kind = starSelect.value || 'war';
+      h.star = {kind,until:turn()+3};
+      buff('star', stars[kind],3);
+      log('길잡이 별 · ' + starSelect.selectedOptions[0]?.textContent);
+    }
+    if (knows('천칭의 눈')) {
+      const describe = actor => {
+        const ordered = stats.map(key => [labels[key],Math.floor(stat(key,actor))]).sort((a,b) => b[1]-a[1]);
+        return '최고 ' + ordered[0].join(' ') + ' / 최저 ' + ordered.at(-1).join(' ');
+      };
+      const score = actor => 20 * (actor.max / 40000 + stats.reduce((sum,key) => sum + stat(key,actor) / 10000, 0));
+      const difference = (score(S.p)-score(S.m)).toFixed(2);
+      log('천칭의 눈 · 전력 차이 ' + difference + ' · 아군 ' + describe(S.p) + ' · 적 ' + describe(S.m));
+    }
+  };
+
+  function learnedSkills() {
+    try {
+      const profile = book.current();
+      if (S?.characterId && profile?.id !== S.characterId) return [];
+      const learned = book.learnedIds(profile?.data);
+      return skills.filter(skill => learned.has(skill.id) && book.canUse(skill,profile?.data));
+    } catch (_) { return []; }
+  }
+  function availableSkills() {
+    const list = learnedSkills();
+    return state() && S?.active ? list.filter(skill => knows(skill.name)) : list;
+  }
+  function block(skill) {
+    if (!ready() || !knows(skill.name)) return '전투 중 자신의 차례에 사용할 수 있어.';
+    const remaining = (state().cooldowns.get(skill.id) || 0) - turn();
+    if (remaining > 0) return '쿨타임 ' + remaining + '턴';
+    if (!target()) return '공격할 적이 없어.';
+    return effects[skill.name].reason?.(context(skill));
+  }
+  function update() {
+    const previous = select.value;
+    const list = availableSkills();
+    select.querySelector('optgroup[data-hidden-combat]')?.remove();
+    // The legacy parser knows five 차원검사 entries, but cannot execute their rules.
+    for (const option of [...select.options]) {
+      if (names.has(option.textContent.split(' · ')[0])) option.remove();
+    }
+    const active = list.filter(skill => !isPassive(skill));
+    if (active.length) {
+      const group = document.createElement('optgroup');
+      group.label = '히든 직업';
+      group.dataset.hiddenCombat = '1';
+      for (const skill of active) group.append(new Option(skill.name,skill.id));
+      select.append(group);
+      if (active.some(skill => skill.id === previous)) select.value = previous;
+      else if (!/^\d+$/.test(select.value)) select.value = active[0].id;
+    }
+    select.disabled = !active.length && ![...select.options].some(x => /^\d+$/.test(x.value));
+    const skill = byId.get(select.value);
+    choiceSelect.hidden = !['천마 양단','두 문의 권능'].includes(skill?.name);
+    const priorAlly = allySelect.value;
+    allySelect.replaceChildren(new Option('나 자신',''), ...allies().slice(1).map(x => new Option(x.name,x.id)));
+    if ([...allySelect.options].some(x => x.value === priorAlly)) allySelect.value = priorAlly;
+    allySelect.hidden = allies().length < 2 || !skill;
+    starSelect.hidden = !!(S?.active && !S.over) || !list.some(x => x.name === '길잡이 별');
+    const passives = list.filter(isPassive).map(x => x.name);
+    passive.textContent = passives.length ? '자동 패시브 · ' + passives.join(' · ') : '';
+    if (skill) {
+      const unavailable = block(skill);
+      info.textContent = skill.name + ' · ' + skill.cooldown + '\n' + skill.effect + '\n' + (unavailable || '사용 가능');
+      button.disabled = !!unavailable;
+    }
+  }
+  globalThis.RpgHiddenCombat = Object.freeze({
+    beginOrdinarySkill(skill) {
+      const h = state();
+      if (!h) return;
+      h.ordinarySkill = skill;
+      h.ordinaryDiscount = h.nextCooldownDiscount || 0;
+      if (/피해/.test(skill.effect)) h.dragonHits++;
+      rollContext = {};
+    },
+    endOrdinarySkill(skill,cooldown) {
+      const h = state();
+      if (!h) return cooldown;
+      const discount = cooldown && skill.kind !== '궁극기' ? h.ordinaryDiscount : 0;
+      if (discount && h.extremeTurn !== turn()) h.nextCooldownDiscount = 0;
+      delete h.ordinarySkill;
+      delete h.ordinaryDiscount;
+      rollContext = null;
+      return Math.max(0,cooldown-discount);
+    },
+    isDimensionAttackStored: () => state()?.dimensionAttack?.due === turn()+1,
+    takeSoftenedFailure: () => !!rollContext?.softened,
+    rollFloor: () => rollContext?.floor || -Infinity,
+    enemySpeed: actor => state() ? stat('spd',actor) : undefined,
+    isDispersedRoll: () => !!rollContext?.dispersed,
+  });
+  const priorRefresh = globalThis.RpgCombatSkillRefresh;
+  globalThis.RpgCombatSkillRefresh = () => { priorRefresh?.(); update(); };
+  select.addEventListener('change',update);
+  document.addEventListener('change',event => {
+    if (event.target.id === 'monsterTarget') update();
+  });
+  choiceSelect.addEventListener('change',update);
+  allySelect.addEventListener('change',update);
+  for (const id of ['start','reset','physical','magical','defend','useBattlePotion','abandon','petContinue','petReroll']) {
+    document.getElementById(id)?.addEventListener('click',() => setTimeout(update,0));
+  }
+  button.addEventListener('click',event => {
+    const skill = byId.get(select.value);
+    if (!skill) return;
+    event.stopImmediatePropagation();
+    const denied = block(skill);
+    if (denied || !availableSkills().includes(skill)) {
+      update();
+      return;
+    }
+    const h = state();
+    const preDiscount = h.nextCooldownDiscount || 0;
+    const cooldown = Number(skill.cooldown.match(/^([0-9]+)턴$/)?.[1] || 0);
+    const normal = skill.kind !== '궁극기';
+    h.skill = skill;
+    let result;
+    try { result = effects[skill.name].use(context(skill)); }
+    finally { h.skill = null; }
+    if (typeof result === 'string' && result) {
+      toast(result);
+      return update();
+    }
+    log(skill.name + ' 사용.');
+    if (cooldown) {
+      h.cooldowns.set(skill.id,turn()+Math.max(0,cooldown-(normal ? preDiscount : 0))+1);
+      if (normal && preDiscount && skill.name !== '가속된 순간' && h.extremeTurn !== turn()) h.nextCooldownDiscount = 0;
+    }
+    if (['용혈 참격','용왕의 숨결'].includes(skill.name)) h.dragonHits++;
+    finish();
+    if (!S.over) petAfterAction();
+    update();
+  },true);
+  update();
+}
+
+  const skills = [{"id":"히든/차원검사/1/균열 참격","name":"균열 참격","kind":"액티브","effect":"공격력 230% 피해. 대상 방어력 25% 무시.","cooldown":"2턴","job":"차원검사"},{"id":"히든/차원검사/2/차원 전송","name":"차원 전송","kind":"액티브","effect":"다음 비궁극기 공격을 다른 차원에 보관했다가 다음 턴 종료에 피해 +35%로 발동. 반격되지 않음.","cooldown":"4턴","job":"차원검사"},{"id":"히든/차원검사/3/위상 도약","name":"위상 도약","kind":"액티브","effect":"다음 직접 공격 1회를 무효화하고 다음 라운드 행동 순서를 가장 앞으로 이동.","cooldown":"5턴","job":"차원검사"},{"id":"히든/차원검사/4/무너진 경계","name":"무너진 경계","kind":"패시브","effect":"차원 계열 공격의 방어 무시가 추가로 10% 증가. 궁극기에는 적용하지 않음.","cooldown":"항상","job":"차원검사"},{"id":"히든/차원검사/5/차원장","name":"차원장","kind":"궁극기","effect":"적 1명에게 공격력 560% 피해. 방어력 50% 무시. 차원 전송 대상에서 제외.","cooldown":"7턴","job":"차원검사"},{"id":"히든/반천 반악/1/천마 양단","name":"천마 양단","kind":"액티브","effect":"공격력과 마력 중 높은 값의 260% 피해. 직전 사용 속성과 반대 속성으로 발동하면 피해 +20%.","cooldown":"2턴","job":"반천 반악"},{"id":"히든/반천 반악/2/두 문의 권능","name":"두 문의 권능","kind":"액티브","effect":"천계: 아군 1명 최대 HP 25% 회복. 마계: 적 1명 방어·마력 -20% 2턴. 사용할 때 형태 선택.","cooldown":"4턴","job":"반천 반악"},{"id":"히든/반천 반악/3/양면 결계","name":"양면 결계","kind":"액티브","effect":"1턴 동안 받는 피해 40% 감소, 감소한 피해의 20%를 공격자에게 반환.","cooldown":"5턴","job":"반천 반악"},{"id":"히든/반천 반악/4/경계의 존재","name":"경계의 존재","kind":"패시브","effect":"현재 HP가 40~60%면 공격·방어·마력·이속 +15%.","cooldown":"항상","job":"반천 반악"},{"id":"히든/반천 반악/5/천지마계 붕괴","name":"천지마계 붕괴","kind":"궁극기","effect":"적 전체에 높은 공격 능력치 500% 피해. 보스 확정 행동·조건은 제거하지 못함.","cooldown":"8턴","job":"반천 반악"},{"id":"히든/네크로맨서/1/망자 소환","name":"망자 소환","kind":"액티브","effect":"해골 2기를 3턴 소환. 각 해골은 매턴 마력 70% 피해. 일반 소환수 최대 2기.","cooldown":"4턴","job":"네크로맨서"},{"id":"히든/네크로맨서/2/영혼 수확","name":"영혼 수확","kind":"액티브","effect":"마력 210% 피해, 준 피해의 40% 회복. 처치하면 영혼 1개 획득, 최대 3개.","cooldown":"2턴","job":"네크로맨서"},{"id":"히든/네크로맨서/3/뼈 감옥","name":"뼈 감옥","kind":"액티브","effect":"마력 160% 피해와 속박 1턴. 보스에게는 속박 대신 이속 -20% 2턴.","cooldown":"4턴","job":"네크로맨서"},{"id":"히든/네크로맨서/4/불사의 계약","name":"불사의 계약","kind":"패시브","effect":"전투당 1회 치명적 피해를 받을 때 영혼 1개를 소모해 HP 1로 생존.","cooldown":"전투당 1회","job":"네크로맨서"},{"id":"히든/네크로맨서/5/망자 군단","name":"망자 군단","kind":"궁극기","effect":"3턴 동안 군단이 적 전체에 매턴 마력 180% 피해. 사용 중 일반 소환수 추가 소환 불가.","cooldown":"8턴","job":"네크로맨서"},{"id":"히든/드루이드/1/세계수의 숨결","name":"세계수의 숨결","kind":"액티브","effect":"아군 1명 마력 220% 회복, 일반 상태이상 1개 제거.","cooldown":"3턴","job":"드루이드"},{"id":"히든/드루이드/2/대지의 속박","name":"대지의 속박","kind":"액티브","effect":"마력 190% 피해와 속박 1턴. 보스에게는 이속 -20% 2턴.","cooldown":"3턴","job":"드루이드"},{"id":"히든/드루이드/3/태고의 수호수","name":"태고의 수호수","kind":"액티브","effect":"수호수 1기를 3턴 소환. 매턴 마력 180% 피해, 소환 중 아군 받는 피해 -10%.","cooldown":"5턴","job":"드루이드"},{"id":"히든/드루이드/4/자연의 순환","name":"자연의 순환","kind":"패시브","effect":"턴 종료마다 최대 HP 5% 회복, 언데드에게 주는 피해 +15%.","cooldown":"항상","job":"드루이드"},{"id":"히든/드루이드/5/세계수의 심판","name":"세계수의 심판","kind":"액티브","effect":"적 1명 마력 450% 피해, 방어·마방 40% 무시, 언데드 피해 +80%.","cooldown":"4턴","job":"드루이드"},{"id":"히든/시간술사/1/시간 지연","name":"시간 지연","kind":"액티브","effect":"적 1명의 다음 행동을 행동 순서 끝으로 이동하고 이속 -20% 1턴.","cooldown":"3턴","job":"시간술사"},{"id":"히든/시간술사/2/가속된 순간","name":"가속된 순간","kind":"액티브","effect":"아군 1명의 이속 +30%, 다음 일반 스킬 쿨타임 -1.","cooldown":"4턴","job":"시간술사"},{"id":"히든/시간술사/3/되감기","name":"되감기","kind":"액티브","effect":"아군 1명의 직전 턴 종료 HP와 일반 상태로 복원. 사망·소모품·궁극기 쿨타임은 복원 불가.","cooldown":"6턴","job":"시간술사"},{"id":"히든/시간술사/4/시간 파편","name":"시간 파편","kind":"패시브","effect":"전투당 처음 받는 행동 지연·쿨타임 증가를 무효화.","cooldown":"전투당 1회","job":"시간술사"},{"id":"히든/시간술사/5/정지한 세계","name":"정지한 세계","kind":"궁극기","effect":"일반 적 전체 행동 1회 상실. 보스는 이속 -40%와 행동 순서 마지막 1회로 대체.","cooldown":"8턴","job":"시간술사"},{"id":"히든/심연술사/1/심연의 손","name":"심연의 손","kind":"액티브","effect":"마력 220% 피해와 심연 표식 1개, 최대 3개.","cooldown":"2턴","job":"심연술사"},{"id":"히든/심연술사/2/표식 폭발","name":"표식 폭발","kind":"액티브","effect":"표식을 전부 소모해 개당 마력 120% 추가 피해.","cooldown":"3턴","job":"심연술사"},{"id":"히든/심연술사/3/심연 봉인","name":"심연 봉인","kind":"액티브","effect":"표식 2개를 소모해 일반 적 행동 1회 봉인. 보스는 공격·마력 -20% 2턴.","cooldown":"5턴","job":"심연술사"},{"id":"히든/심연술사/4/깊은 흔적","name":"깊은 흔적","kind":"패시브","effect":"표식 1개당 대상 방어력 -8%. 체력 감소와 연동하지 않음.","cooldown":"항상","job":"심연술사"},{"id":"히든/심연술사/5/심연핵 붕괴","name":"심연핵 붕괴","kind":"궁극기","effect":"적 전체 마력 420% 피해, 각 대상 표식을 모두 소모해 표식당 피해 +15%.","cooldown":"7턴","job":"심연술사"},{"id":"히든/음율사/1/전쟁의 선율","name":"전쟁의 선율","kind":"액티브","effect":"아군 전체 공격·마력 +20% 2턴.","cooldown":"3턴","job":"음율사"},{"id":"히든/음율사/2/수호의 선율","name":"수호의 선율","kind":"액티브","effect":"아군 전체 방어 +25% 2턴.","cooldown":"3턴","job":"음율사"},{"id":"히든/음율사/3/질주의 선율","name":"질주의 선율","kind":"액티브","effect":"아군 전체 이속 +25% 2턴.","cooldown":"3턴","job":"음율사"},{"id":"히든/음율사/4/생명의 선율","name":"생명의 선율","kind":"액티브","effect":"아군 전체 마력 140% 회복. 같은 선율 연속 사용 불가.","cooldown":"3턴","job":"음율사"},{"id":"히든/음율사/5/세계의 교향곡","name":"세계의 교향곡","kind":"궁극기","effect":"직전 네 선율이 모두 다르면 아군 전체 HP 30% 회복, 모든 전투 능력치 +20% 3턴.","cooldown":"8턴","job":"음율사"},{"id":"히든/공간술사/1/공간 도약","name":"공간 도약","kind":"액티브","effect":"자신의 행동 순서를 즉시 다음으로 당기고 직접 공격 1회 회피 보정 +20.","cooldown":"3턴","job":"공간술사"},{"id":"히든/공간술사/2/위치 교환","name":"위치 교환","kind":"액티브","effect":"아군 1명과 위치·대상 지정 상태를 교환. 확정 대상 스킬은 변경 불가.","cooldown":"4턴","job":"공간술사"},{"id":"히든/공간술사/3/공간 고정","name":"공간 고정","kind":"액티브","effect":"일반 적 이동 불가 2턴. 보스는 이속 -25% 2턴.","cooldown":"4턴","job":"공간술사"},{"id":"히든/공간술사/4/접힌 거리","name":"접힌 거리","kind":"패시브","effect":"전투당 첫 위치·거리 불이익을 무시.","cooldown":"전투당 1회","job":"공간술사"},{"id":"히든/공간술사/5/무한 격리","name":"무한 격리","kind":"궁극기","effect":"적 1명 마력 480% 피해, 일반 소환수·장판 제거. 보스 본체의 확정 위치·조건은 유지.","cooldown":"7턴","job":"공간술사"},{"id":"히든/용혈전사/1/용혈 참격","name":"용혈 참격","kind":"액티브","effect":"공격력 240% 피해, 세 번째 직접 공격이면 숨결 120% 추가 피해.","cooldown":"2턴","job":"용혈전사"},{"id":"히든/용혈전사/2/용린 강화","name":"용린 강화","kind":"액티브","effect":"방어 +30%, 상태이상 저항 +15 2턴.","cooldown":"4턴","job":"용혈전사"},{"id":"히든/용혈전사/3/혈맥 폭발","name":"혈맥 폭발","kind":"액티브","effect":"현재 HP 10%를 사용해 공격력·이속 +25% 3턴. HP 1 아래로 내려가지 않음.","cooldown":"5턴","job":"용혈전사"},{"id":"히든/용혈전사/4/용의 피","name":"용의 피","kind":"패시브","effect":"용족에게 받는 피해 -15%, 화염·빙결·번개 지속시간 -1턴.","cooldown":"항상","job":"용혈전사"},{"id":"히든/용혈전사/5/용왕의 숨결","name":"용왕의 숨결","kind":"궁극기","effect":"적 전체 공격력 420% 피해, 방어력 30% 무시.","cooldown":"7턴","job":"용혈전사"},{"id":"히든/별의 관측자/1/전사의 성좌","name":"전사의 성좌","kind":"액티브","effect":"공격력 +25% 3턴. 다른 성좌 사용 시 교체.","cooldown":"3턴","job":"별의 관측자"},{"id":"히든/별의 관측자/2/수호의 성좌","name":"수호의 성좌","kind":"액티브","effect":"방어력 +30% 3턴. 다른 성좌 사용 시 교체.","cooldown":"3턴","job":"별의 관측자"},{"id":"히든/별의 관측자/3/현자의 성좌","name":"현자의 성좌","kind":"액티브","effect":"마력 +25% 3턴. 다른 성좌 사용 시 교체.","cooldown":"3턴","job":"별의 관측자"},{"id":"히든/별의 관측자/4/길잡이 별","name":"길잡이 별","kind":"패시브","effect":"전투 시작 시 전사·수호·현자·질주 성좌 중 하나를 선택.","cooldown":"항상","job":"별의 관측자"},{"id":"히든/별의 관측자/5/성좌 낙하","name":"성좌 낙하","kind":"궁극기","effect":"적 전체 마력 450% 피해. 현재 성좌에 따라 공격/방어/회복/이속 보조 효과 1개 추가.","cooldown":"7턴","job":"별의 관측자"},{"id":"히든/균형 조율자/1/낮은 쪽의 힘","name":"낮은 쪽의 힘","kind":"액티브","effect":"아군 1명의 공격·방어·마력 중 최저치에 최고치의 20% 추가, 최고치 초과 불가.","cooldown":"3턴","job":"균형 조율자"},{"id":"히든/균형 조율자/2/높은 쪽의 억제","name":"높은 쪽의 억제","kind":"액티브","effect":"적의 가장 높은 강화 효과를 절반으로 낮춤 2턴. 보스 고유 페이즈 강화는 20%만 감소.","cooldown":"4턴","job":"균형 조율자"},{"id":"히든/균형 조율자/3/균형 회복","name":"균형 회복","kind":"액티브","effect":"아군 전체 HP 비율을 평균내어 재분배. 총 HP는 증가하지 않음.","cooldown":"5턴","job":"균형 조율자"},{"id":"히든/균형 조율자/4/천칭의 눈","name":"천칭의 눈","kind":"패시브","effect":"전투 시작 시 양측 전력 차이와 가장 높은·낮은 전투 능력치를 확인.","cooldown":"항상","job":"균형 조율자"},{"id":"히든/균형 조율자/5/완전한 평형","name":"완전한 평형","kind":"궁극기","effect":"2턴 동안 양측의 외부 능력치 증가·감소 폭을 ±30% 이내로 제한. 보스 확정 조건은 유지.","cooldown":"8턴","job":"균형 조율자"},{"id":"히든/확률술사/1/실패 완화","name":"실패 완화","kind":"액티브","effect":"전투당 1회 자신의 치명적 실패를 일반 실패로 변경.","cooldown":"전투당 1회","job":"확률술사"},{"id":"히든/확률술사/2/운명의 재굴림","name":"운명의 재굴림","kind":"액티브","effect":"자신 또는 아군 전투 판정 1회를 재굴림. 더 낮아도 새 결과 강제 사용.","cooldown":"4턴","job":"확률술사"},{"id":"히든/확률술사/3/결과 분산","name":"결과 분산","kind":"액티브","effect":"적 1명의 자연 96~100을 일반 성공으로 낮춤. 보스 확정 행동에는 사용 불가.","cooldown":"5턴","job":"확률술사"},{"id":"히든/확률술사/4/극값의 기억","name":"극값의 기억","kind":"패시브","effect":"전투 중 자연 1 뒤 자연 100 또는 반대 순서가 나오면 다음 스킬 쿨타임 -1.","cooldown":"턴당 1회","job":"확률술사"},{"id":"히든/확률술사/5/운명의 설계","name":"운명의 설계","kind":"궁극기","effect":"아군 전체가 이번 라운드에 굴리는 첫 전투 판정의 최소 최종값을 50으로 보정. 자연 1은 제외.","cooldown":"8턴","job":"확률술사"}];
+  const frame = document.getElementById('embeddedFrame');
+  function connect() {
+    setTimeout(() => {
+      const doc = frame?.contentDocument;
+      if (!doc?.querySelector('#combatSkill') || doc.querySelector('#combatSkill').dataset.hiddenCombat) return;
+      const script = doc.createElement('script');
+      script.textContent = '(' + installHiddenCombat.toString() + ')(' + JSON.stringify(skills) + ');';
+      doc.body.append(script);
+      script.remove();
+    }, 0);
+  }
+  frame?.addEventListener('load',connect);
+  frame?.addEventListener('rpg-combat-skills-ready',connect);
+  connect();
 })();
